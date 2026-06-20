@@ -1,0 +1,10 @@
+{
+  "name": "Un Coup de Pousse Planning",
+  "short_name": "UCDP Planning",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#111111",
+  "icons": []
+}
