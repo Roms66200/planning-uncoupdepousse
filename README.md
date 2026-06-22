@@ -1,8 +1,7 @@
-# UCDP Planning V8
+# UCDP Planning V9
 
-Ajouts :
-- Clé API OpenRouteService dans Réglages.
-- Calcul km route réel par journée.
-- Optimisation de l’ordre de tournée d’une journée.
-- Lien itinéraire complet Apple Plans / Google Maps.
-- Repli automatique sur distance GPS approximative si API absente.
+Correctifs :
+- Correction modification/enregistrement des clients importés depuis contacts iPhone.
+- Édition basée sur l'ID client.
+- Horaire forcé masqué par défaut avec case à cocher.
+- Passages exceptionnels masqués par défaut avec case à cocher.
