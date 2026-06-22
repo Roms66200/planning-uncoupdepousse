@@ -35,14 +35,14 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <body>
 <header>
 <h1>Un Coup de Pousse — Planning</h1>
-<div class="status" id="autosaveHeader">Version 12</div>
+<div class="status" id="autosaveHeader">Version 13</div>
 <div class="tabs">
 <button onclick="showTab('home')">Accueil</button><button onclick="showTab('clients')">Clients</button><button onclick="showTab('planning')">Planning</button><button onclick="showTab('turnover')">CA</button><button onclick="showTab('map')">Carte</button><button onclick="showTab('backup')">Sauvegarde</button>
 </div>
 </header>
 <main>
 <section id="home" class="card">
-<h2>Accueil / Réglages</h2><div class="ok"><b>Version 12 installée</b> — fréquences spéciales, anti NON PLACÉ : décalage automatique et placement hors consigne si nécessaire.</div>
+<h2>Accueil / Réglages</h2><div class="ok"><b>Version 13 installée</b> — fréquences spéciales, fréquences hebdomadaires corrigées, créneaux découpés et anti-doublons client/jour.</div>
 <div class="row"><div><label>Année</label><input id="year" type="number" value="2027"></div><div><label>Adresse départ</label><input id="homeAddress" placeholder="Montescot, France"></div></div>
 <div class="row"><div><label>Latitude départ</label><input id="homeLat" type="number" step="0.000001"></div><div><label>Longitude départ</label><input id="homeLng" type="number" step="0.000001"></div></div>
 <label>Clé API OpenRouteService</label><input id="orsApiKey" placeholder="Colle ta clé OpenRouteService ici">
@@ -167,7 +167,7 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 </main>
 
 <script>
-const APP_VERSION="12.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
+const APP_VERSION="13.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
 let db=null,state={settings:null,clients:[],planning:[]};
 const monthNames=["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"],dayNames={1:"Lundi",2:"Mardi",3:"Mercredi",4:"Jeudi",5:"Vendredi",6:"Samedi"};
 function showTab(id){["home","clients","planning","turnover","map","backup"].forEach(x=>document.getElementById(x).classList.add("hidden"));document.getElementById(id).classList.remove("hidden");if(id==="backup")renderBackupStatus();if(id==="turnover")renderTurnover();if(id==="planning")renderPlanning();if(id==="map")renderMapLinks()}
@@ -260,14 +260,24 @@ function resetClientForm(){editIndex.value="-1";["clientName","address","email",
 function editClient(id){let raw=state.clients.find(x=>String(x.id)===String(id));if(!raw){alert("Client introuvable");return}let c=migrateClient(raw);editIndex.value=String(c.id);clientName.value=c.name||"";clientType.value=c.type;address.value=c.address||"";email.value=c.email||"";phone.value=c.phone||"";lat.value=c.lat??"";lng.value=c.lng??"";defaultDuration.value=c.defaultDuration;priceMode.value=c.priceMode;price.value=c.price;placementMode.value=c.placementMode==="forcer"?"forcer":c.placementMode;useForcedTime.checked=c.placementMode==="forcer";toggleForcedTime();forcedStart.value=c.forcedStart;forcedEnd.value=c.forcedEnd;useNeighborGroup.checked=!!c.linkedGroup;toggleNeighborGroup();linkedGroup.value=c.linkedGroup||"";neighborOrder.value=c.neighborOrder||"";useSecondFrequency.checked=!!c.useSecondFrequency;toggleSecondFrequency();secondStartMonth.value=c.secondStartMonth??3;secondEndMonth.value=c.secondEndMonth??9;secondWeeks.value=c.secondWeeks??1;secondWeekday.value=c.secondWeekday??3;secondDuration.value=c.secondDuration??2;secondPlacement.value=c.secondPlacement||"forcer";secondForcedStart.value=c.secondForcedStart||"16:00";secondForcedEnd.value=c.secondForcedEnd||"18:00";frequencyMode.value=c.frequencyMode;toggleFrequencyMode();c.monthlyVisits.forEach((v,i)=>document.getElementById("mv"+i).value=v);intervalStartMonth.value=c.intervalStartMonth;intervalEndMonth.value=c.intervalEndMonth;intervalWeeks.value=c.intervalWeeks;intervalDuration.value=c.intervalDuration;c.specialMonths.forEach((v,i)=>{document.getElementById("spv"+i).value=v.visits;document.getElementById("spd"+i).value=v.duration});let hasEx=(c.exceptionMonths||[]).some(x=>(x.visits||0)>0);useExceptions.checked=hasEx;toggleExceptions();(c.exceptionMonths||Array.from({length:12},()=>({visits:0,duration:8}))).forEach((v,i)=>{document.getElementById("exv"+i).value=v.visits||0;document.getElementById("exd"+i).value=v.duration||8});monthPosition.value=c.monthPosition;minGap.value=c.minGap;notes.value=c.notes||"";setCheckedDays(c.allowedDays);showTab("clients");scrollTo(0,0)}
 async function deleteClient(id){if(confirm("Supprimer ce client ?")){await del("clients",id);state.clients=await getAll("clients");renderClients();scheduleAutosave("suppression")}}
 function revenueFor(c,d){return c.priceMode==="hour"?c.price*d:c.price}
-function expandClientJobs(c){c=migrateClient(c);let jobs=[],y=state.settings?.year||2027;if(c.frequencyMode==="interval"){let d=new Date(y,c.intervalStartMonth,1),end=new Date(y,c.intervalEndMonth+1,0);while(d<=end){jobs.push({month:d.getMonth(),duration:c.intervalDuration});d.setDate(d.getDate()+7*c.intervalWeeks)}}else if(c.frequencyMode==="special"){c.specialMonths.forEach((m,mi)=>{for(let k=0;k<(m.visits||0);k++)jobs.push({month:mi,duration:m.duration||c.defaultDuration})})}else c.monthlyVisits.forEach((n,mi)=>{for(let k=0;k<n;k++)jobs.push({month:mi,duration:c.defaultDuration})});(c.exceptionMonths||[]).forEach((m,mi)=>{for(let k=0;k<(m.visits||0);k++)jobs.push({month:mi,duration:m.duration||8})});if(c.useSecondFrequency){
+function expandClientJobs(c){
+c=migrateClient(c);
+let jobs=[],y=state.settings?.year||2027;
+if(c.frequencyMode==="interval"){
+  let d=new Date(y,c.intervalStartMonth,1);
+  let end=new Date(y,c.intervalEndMonth+1,0);
+  while(d<=end){jobs.push({month:d.getMonth(),duration:c.intervalDuration,targetDate:toISO(d)});d.setDate(d.getDate()+7*c.intervalWeeks)}
+}else if(c.frequencyMode==="special"){
+  c.specialMonths.forEach((m,mi)=>{for(let k=0;k<(m.visits||0);k++)jobs.push({month:mi,duration:m.duration||c.defaultDuration})});
+}else{
+  c.monthlyVisits.forEach((n,mi)=>{for(let k=0;k<n;k++)jobs.push({month:mi,duration:c.defaultDuration})});
+}
+(c.exceptionMonths||[]).forEach((m,mi)=>{for(let k=0;k<(m.visits||0);k++)jobs.push({month:mi,duration:m.duration||8,exception:true})});
+if(c.useSecondFrequency){
   let d=new Date(y,c.secondStartMonth,1);
   let end=new Date(y,c.secondEndMonth+1,0);
   while(d.getDay()!==c.secondWeekday%7){d.setDate(d.getDate()+1)}
-  while(d<=end){
-    jobs.push({month:d.getMonth(),duration:c.secondDuration,weekday:c.secondWeekday,placement:c.secondPlacement,forcedStart:c.secondForcedStart,forcedEnd:c.secondForcedEnd,secondary:true});
-    d.setDate(d.getDate()+7*c.secondWeeks);
-  }
+  while(d<=end){jobs.push({month:d.getMonth(),duration:c.secondDuration,weekday:c.secondWeekday,placement:c.secondPlacement,forcedStart:c.secondForcedStart,forcedEnd:c.secondForcedEnd,secondary:true,targetDate:toISO(d)});d.setDate(d.getDate()+7*c.secondWeeks)}
 }
 return jobs}
 function renderClients(){let h="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{c=migrateClient(c);let jobs=expandClientJobs(c),ca=jobs.reduce((s,j)=>s+revenueFor(c,j.duration),0);h+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.frequencyMode}</span><span class="badge">${jobs.length} pass/an</span><span class="badge">${ca.toFixed(0)} €</span>${c.linkedGroup?`<span class="badge">Lié : ${c.linkedGroup}</span>`:""}${c.useSecondFrequency?`<span class="badge">2e fréquence</span>`:""}${c.neighborOrder?`<span class="badge">${c.neighborOrder==="before"?"Avant":"Après"}</span>`:""}<br><span class="small">${c.address||""}</span><br><button onclick="editClient(${c.id})">Modifier</button><button class="danger" onclick="deleteClient(${c.id})">Supprimer</button></div>`});clientList.innerHTML=h||'<p class="small">Aucun client.</p>'}
@@ -293,8 +303,16 @@ for(let d of base){
 let seen=new Set();
 return [...base,...extra].filter(d=>{let k=toISO(d);if(seen.has(k))return false;seen.add(k);return true});
 }
+function targetDatesAround(target,mi){let flex=state.settings?.planningFlexDays??7;let base=parseDate(target);let arr=[];for(let off=-flex;off<=flex;off++){let d=new Date(base);d.setDate(base.getDate()+off);if(d.getMonth()===mi)arr.push(d)}return arr.length?arr:[base]}
 function gapOK(c,date){let d=parseDate(date);return state.planning.filter(p=>p.client===c.name&&p.date!=="NON PLACÉ").map(p=>parseDate(p.date)).every(x=>Math.abs((d-x)/86400000)>=c.minGap)}
-function mins(t){let [h,m]=t.split(":").map(Number);return h*60+m}function slotHours(s){return Math.max(0,(mins(s[2])-mins(s[1]))/60)}function used(date,key){return state.planning.filter(p=>p.date===date&&p.slotKey===key).reduce((a,p)=>a+p.duration,0)}
+function mins(t){let [h,m]=t.split(":").map(Number);return h*60+m}
+function hhmm(total){total=Math.round(total);let h=Math.floor(total/60),m=total%60;return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")}
+function slotHours(s){return Math.max(0,(mins(s[2])-mins(s[1]))/60)}
+function used(date,key){return state.planning.filter(p=>p.date===date&&p.slotKey===key).reduce((a,p)=>a+p.duration,0)}
+function usedMinutes(date,key){return used(date,key)*60}
+function clientAlreadyThisDay(client,date){return state.planning.some(p=>p.client===client&&p.date===date)}
+function makeActualSlot(s,date,key,duration){let start=mins(s[1])+usedMinutes(date,key);let end=start+duration*60;if(end>mins(s[2])){start=mins(s[1]);end=mins(s[2])}return `${s[0]} ${hhmm(start)}-${hhmm(end)}`}
+
 function dist(a,b,c,d){if(!a||!b||!c||!d)return 9999;let R=6371,la=(c-a)*Math.PI/180,lo=(d-b)*Math.PI/180,x=Math.sin(la/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(lo/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 function geo(date,c){let same=state.planning.filter(p=>p.date===date&&p.lat&&p.lng);let score=!same.length?dist(state.settings.homeLat,state.settings.homeLng,c.lat,c.lng):Math.min(...same.map(p=>dist(p.lat,p.lng,c.lat,c.lng)));if(c.linkedGroup&&state.planning.some(p=>p.date===date&&p.linkedGroup&&p.linkedGroup.toLowerCase()===c.linkedGroup.toLowerCase()))score-=50;return score}
 function compatibleSlots(c,dow,dur,job=null){
@@ -314,31 +332,31 @@ if(c.placementMode==="forcer")return [["Forcé",c.forcedStart,c.forcedEnd,true,"
 return [["Hors consigne","08:00",String(8+dur).padStart(2,"0")+":00",true,"forced-fallback-"+dur]];
 }
 
-async function generatePlanning(){await saveSettingsNow(false);let lockedVisits=state.planning.filter(p=>p.locked&&p.date&&p.date!=="NON PLACÉ");state.planning=[...lockedVisits];let jobs=[];state.clients.forEach(c=>expandClientJobs(c).forEach((j,k)=>jobs.push({c:migrateClient(c),month:j.month,duration:j.duration,k})));jobs.sort((a,b)=>((a.c.allowedDays||[]).length+(a.c.placementMode==="indifferent"?2:0))-((b.c.allowedDays||[]).length+(b.c.placementMode==="indifferent"?2:0)));let blocked=blockedSet(),y=state.settings.year;for(let j of jobs){let c=j.c,dates=candDates(y,j.month,c.monthPosition);if(j.k>0)dates=dates.concat(candDates(y,j.month,"Indifférent"));let poss=[];for(let d of dates){let iso=toISO(d),dow=d.getDay();if(dow===0||blocked.has(iso)||!(c.allowedDays||[]).includes(dow)||!gapOK(c,iso))continue;if(j.weekday&&dow!==j.weekday)continue;let list=compatibleSlots(c,dow,j.duration,j);
+async function generatePlanning(){await saveSettingsNow(false);let lockedVisits=state.planning.filter(p=>p.locked&&p.date&&p.date!=="NON PLACÉ");state.planning=[...lockedVisits];let jobs=[];state.clients.forEach(c=>expandClientJobs(c).forEach((j,k)=>jobs.push({c:migrateClient(c),month:j.month,duration:j.duration,k})));jobs.sort((a,b)=>((a.c.allowedDays||[]).length+(a.c.placementMode==="indifferent"?2:0))-((b.c.allowedDays||[]).length+(b.c.placementMode==="indifferent"?2:0)));let blocked=blockedSet(),y=state.settings.year;for(let j of jobs){let c=j.c,dates=j.targetDate?targetDatesAround(j.targetDate,j.month):candDates(y,j.month,c.monthPosition);if(!j.targetDate&&j.k>0)dates=dates.concat(candDates(y,j.month,"Indifférent"));let poss=[];for(let d of dates){let iso=toISO(d),dow=d.getDay();if(dow===0||blocked.has(iso)||!(c.allowedDays||[]).includes(dow)||!gapOK(c,iso)||clientAlreadyThisDay(c.name,iso))continue;if(j.weekday&&dow!==j.weekday)continue;let list=compatibleSlots(c,dow,j.duration,j);
 if(!list.length && state.settings.forcePlacement==="true")list=fallbackSlots(c,dow,j.duration,j);
-list.forEach(s=>{let key=s[4];if(used(iso,key)+j.duration<=slotHours(s)||key.startsWith("forced-fallback"))poss.push({date:iso,slot:s,slotKey:key,score:geo(iso,c),relaxed:key.startsWith("forced")||s[0]==="Hors consigne"})})}poss.sort((a,b)=>a.score-b.score||a.date.localeCompare(b.date));if(poss.length){let p=poss[0];state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:p.date,slot:`${p.slot[0]} ${p.slot[1]}-${p.slot[2]}`,slotKey:p.slotKey,client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false})}else{
+list.forEach(s=>{let key=s[4];if(used(iso,key)+j.duration<=slotHours(s))poss.push({date:iso,slot:s,slotKey:key,score:geo(iso,c),relaxed:key.startsWith("forced")||s[0]==="Hors consigne"})})}poss.sort((a,b)=>a.score-b.score||a.date.localeCompare(b.date));if(poss.length){let p=poss[0];state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:p.date,slot:makeActualSlot(p.slot,p.date,p.slotKey,j.duration),slotKey:p.slotKey,client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false,relaxed:p.relaxed||false})}else{
  if(state.settings.forcePlacement==="true"){
   let allMonth=candDates(y,j.month,"Indifférent");
   let placed=false;
   for(let d of allMonth){
     let iso=toISO(d),dow=d.getDay();
-    if(dow===0||blocked.has(iso))continue;
+    if(dow===0||blocked.has(iso)||clientAlreadyThisDay(c.name,iso))continue;
     let s=fallbackSlots(c,dow,j.duration,j)[0];
-    state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:iso,slot:`${s[0]} ${s[1]}-${s[2]}`,slotKey:s[4],client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false,relaxed:true});
+    state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:iso,slot:makeActualSlot(s,iso,s[4],j.duration),slotKey:s[4],client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false,relaxed:true});
     placed=true;break;
   }
   if(!placed)state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:"NON PLACÉ",slot:"",slotKey:"",client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false});
  }else state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:"NON PLACÉ",slot:"",slotKey:"",client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false});
 }}sortPlanningWithNeighbors();renderPlanning();renderTurnover();mapDate.innerHTML="";scheduleAutosave("planning")}
-function renderPlanning(){if(viewMode.value==="calendar"){planningTable.innerHTML="";renderCalendar();return}if(viewMode.value==="week"){planningTable.innerHTML="";renderWeek();return}calendarView.innerHTML="";let placed=state.planning.filter(p=>p.date!=="NON PLACÉ"),total=placed.reduce((a,p)=>a+p.revenue,0),cesu=placed.filter(p=>p.type==="CESU").reduce((a,p)=>a+p.revenue,0),non=state.planning.length-placed.length;summary.innerHTML=`<div class="${non?'warn':'ok'}">CA placé : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Non placés : <b>${non}</b><br>Placés hors consigne : <b>${state.planning.filter(p=>p.relaxed).length}</b></div>`;let h="<table><tr><th>Date</th><th>Créneau</th><th>Client</th><th>Type</th><th>Durée</th><th>CA</th><th>Statut</th></tr>";state.planning.forEach(p=>h+=`<tr><td>${p.date}</td><td>${p.slot}</td><td>${p.client}</td><td>${p.type}</td><td>${p.duration} h</td><td>${p.revenue.toFixed(0)}€</td><td>${p.locked?"🔒":""}${p.manual?" manuel":""}${p.relaxed?" hors consigne":""}</td></tr>`);planningTable.innerHTML=h+"</table>";refreshVisitEditSelect();refreshClientPdfSelect()}
+function renderPlanning(){if(viewMode.value==="calendar"){planningTable.innerHTML="";renderCalendar();return}if(viewMode.value==="week"){planningTable.innerHTML="";renderWeek();return}calendarView.innerHTML="";let placed=state.planning.filter(p=>p.date!=="NON PLACÉ"),total=placed.reduce((a,p)=>a+p.revenue,0),cesu=placed.filter(p=>p.type==="CESU").reduce((a,p)=>a+p.revenue,0),non=state.planning.length-placed.length;summary.innerHTML=`<div class="${non?'warn':'ok'}">CA placé : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Non placés : <b>${non}</b><br>Placés hors consigne / décalés : <b>${state.planning.filter(p=>p.relaxed).length}</b></div>`;let h="<table><tr><th>Date</th><th>Créneau</th><th>Client</th><th>Type</th><th>Durée</th><th>CA</th><th>Statut</th></tr>";state.planning.forEach(p=>h+=`<tr><td>${p.date}</td><td>${p.slot}</td><td>${p.client}</td><td>${p.type}</td><td>${p.duration} h</td><td>${p.revenue.toFixed(0)}€</td><td>${p.locked?"🔒":""}${p.manual?" manuel":""}${p.relaxed?" hors consigne":""}</td></tr>`);planningTable.innerHTML=h+"</table>";refreshVisitEditSelect();refreshClientPdfSelect()}
 function renderCalendar(){let mi=+calendarMonth.value,y=state.settings.year,last=new Date(y,mi+1,0).getDate(),first=new Date(y,mi,1).getDay(),off=first===0?6:first-1;let h=`<h3>${monthNames[mi]} ${y}</h3><div class="monthGrid">`;["L","M","M","J","V","S","D"].forEach(d=>h+=`<div class="dayCell"><b>${d}</b></div>`);for(let i=0;i<off;i++)h+=`<div class="dayCell"></div>`;for(let day=1;day<=last;day++){let iso=toISO(new Date(y,mi,day)),ev=state.planning.filter(p=>p.date===iso);h+=`<div class="dayCell"><div class="dayNum">${day}</div>`;ev.forEach(e=>h+=`<div class="event">${e.locked?"🔒 ":""}${e.slot}<br>${e.client}</div>`);h+="</div>"}calendarView.innerHTML=h+"</div>";summary.innerHTML="";planningTable.innerHTML=""}
 function renderTurnover(){let m=Array.from({length:12},()=>({cesu:0,ent:0,hours:0,total:0}));state.planning.filter(p=>p.date!=="NON PLACÉ").forEach(p=>{let i=+p.date.slice(5,7)-1;m[i].hours+=p.duration;m[i].total+=p.revenue;p.type==="CESU"?m[i].cesu+=p.revenue:m[i].ent+=p.revenue});let total=m.reduce((a,x)=>a+x.total,0),cesu=m.reduce((a,x)=>a+x.cesu,0),hours=m.reduce((a,x)=>a+x.hours,0);turnoverSummary.innerHTML=`<div class="ok">CA annuel : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Heures : <b>${hours.toFixed(0)} h</b></div>`;let h="<table><tr><th>Mois</th><th>CESU</th><th>Entreprise</th><th>Total</th><th>Heures</th></tr>";m.forEach((x,i)=>h+=`<tr><td>${monthNames[i]}</td><td>${x.cesu.toFixed(0)}€</td><td>${x.ent.toFixed(0)}€</td><td><b>${x.total.toFixed(0)}€</b></td><td>${x.hours.toFixed(0)}h</td></tr>`);turnoverTable.innerHTML=h+"</table>"}
 function printPlanning(){showTab("planning");setTimeout(()=>window.print(),300)}
 function backupObject(){return{app:"Un Coup de Pousse PWA",version:APP_VERSION,exportedAt:new Date().toISOString(),settings:state.settings,clients:state.clients,planning:state.planning}}
 let autosaveTimer=null;function scheduleAutosave(r){if(autosaveTimer)clearTimeout(autosaveTimer);autosaveHeader.innerText="Auto-sauvegarde en attente…";autosaveTimer=setTimeout(()=>autoSave(r),800)}
-async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v12",id);updateAutoSaveHeader();renderBackupStatus()}
+async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v13",id);updateAutoSaveHeader();renderBackupStatus()}
 async function cleanupAutosaves(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));for(let i=12;i<all.length;i++)await del("autosaves",all[i].id)}
-function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v12");autosaveHeader.innerText=l?`Version 12 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 12 — pas encore sauvegardé"}
+function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v13");autosaveHeader.innerText=l?`Version 13 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 13 — pas encore sauvegardé"}
 async function renderBackupStatus(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));backupStatus.innerHTML=`<div class="ok">Clients : <b>${state.clients.length}</b><br>Copies locales : <b>${all.length}</b></div>`;autosaveList.innerHTML=all.map(a=>`<div class="client"><b>${new Date(a.id).toLocaleString("fr-FR")}</b><br><span class="small">${a.reason||""}</span><br><button onclick="restoreAutosave('${a.id}')">Restaurer</button><button onclick="downloadAutosave('${a.id}')">Télécharger</button></div>`).join("")}
 function download(name,txt,type){let b=new Blob([txt],{type}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 function exportBackup(){download("sauvegarde_ucdp.json",JSON.stringify(backupObject(),null,2),"application/json")}
@@ -546,7 +564,7 @@ function renderMapLinks(){
   mapLinks.innerHTML=html;
 }
 
-if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=12").then(r=>r.update()).catch(()=>{})}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=13").then(r=>r.update()).catch(()=>{})}
 openDB().then(loadAll);
 </script>
 </body>

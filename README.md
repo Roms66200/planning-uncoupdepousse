@@ -1,7 +1,3 @@
-# UCDP Planning V12
+# UCDP Planning V13
 
-Ajout :
-- Anti NON PLACÉ.
-- Décalage automatique ± 3 / 7 / 14 jours ou tout le mois.
-- Placement forcé hors consigne si nécessaire.
-- Les rendez-vous forcés sont marqués “hors consigne”.
+Correctifs : fréquences hebdomadaires avec date cible, deuxième fréquence mieux prise en compte, anti-doublon client/jour, découpage des créneaux 2h.
