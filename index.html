@@ -46,6 +46,7 @@ table{border-collapse:collapse;width:100%;font-size:13px;background:white}
 th,td{border:1px solid #ddd;padding:7px;text-align:left}
 th{background:#eee}
 .statusbar{font-size:12px;color:#d9d9d9}
+@media print{header,.tabs,button,#backup,#clients,#home{display:none!important}body{background:#fff}main{padding:0;max-width:none}.card{box-shadow:none;border-radius:0;margin:0}#planning{display:block!important}table{font-size:11px}}
 @media(max-width:390px){.row{grid-template-columns:1fr}.months{grid-template-columns:repeat(2,1fr)}.tabs{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -108,8 +109,8 @@ th{background:#eee}
 <button onclick="geocodeClient()">Trouver GPS client</button>
 
 <div class="row">
-<div><label>Type</label><select id="clientType"><option>CESU</option><option>Entreprise</option><option>Copropriété</option><option>Contrat annuel</option><option>Ponctuel</option></select></div>
-<div><label>Durée passage</label><select id="duration"><option value="2">2 h</option><option value="3">3 h</option><option value="4" selected>4 h</option><option value="7">Journée 7 h</option></select></div>
+<div><label>Type</label><select id="clientType"><option>CESU</option><option>Entreprise</option></select></div>
+<div><label>Durée passage</label><select id="duration"><option value="2">2 h</option><option value="3">3 h</option><option value="4" selected>4 h</option><option value="8">Journée 8 h</option></select></div>
 </div>
 <div class="row">
 <div><label>Mode tarif</label><select id="priceMode"><option value="hour">Horaire</option><option value="visit">Forfait passage</option><option value="halfday">Demi-journée</option><option value="day">Journée</option></select></div>
@@ -121,12 +122,19 @@ th{background:#eee}
 </div>
 <label>Type de placement</label>
 <select id="placementMode">
-<option value="normal">Normal : créneau complet 4 h</option>
-<option value="court">Court : peut combler un trou de 2 h</option>
-<option value="fin_matin">Fin de matinée : idéal 10h-12h</option>
-<option value="debut_matin">Début de matinée : idéal 8h-10h</option>
-<option value="souple">Souple : n’importe quel créneau compatible</option>
+<option value="matin">Matin</option>
+<option value="apresmidi">Après-midi</option>
+<option value="indifferent">Indifférent</option>
+<option value="hors_horaires">Forcer hors horaires</option>
 </select>
+<div class="slot">
+<div class="slotTitle">Si “forcer hors horaires”</div>
+<p class="small">Exemple : client de 2 h de 12h à 14h, puis voisin de 14h à 16h.</p>
+<div class="row">
+<div><label>Début forcé</label><input id="forcedStart" type="time" value="12:00"></div>
+<div><label>Fin forcée</label><input id="forcedEnd" type="time" value="14:00"></div>
+</div>
+</div>
 <label>Écart minimum entre passages</label><input id="minGap" type="number" value="7">
 <label>Jours autorisés</label>
 <div class="days" id="allowedDays">
@@ -150,7 +158,7 @@ th{background:#eee}
 <h2>Planning</h2>
 <button onclick="generatePlanning()">Générer l’année</button>
 <button class="light" onclick="exportPlanningCSV()">Export CSV</button>
-<button class="light" onclick="window.print()">PDF / imprimer</button>
+<button class="light" onclick="printPlanning()">PDF / imprimer</button>
 <div id="summary"></div>
 <div id="planningTable" class="tablewrap"></div>
 </section>
@@ -185,15 +193,15 @@ function del(store,key){return new Promise(res=>{let r=tx(store,"readwrite").del
 function clearStore(store){return new Promise(res=>{let r=tx(store,"readwrite").clear();r.onsuccess=()=>res()})}
 
 function defaultSettings(){return{ id:"main", year:2027, homeAddress:"", homeLat:null, homeLng:null, blockedDates:"", slots:defaultSlots(), updatedAt:new Date().toISOString()}}
-function defaultSlots(){return{1:[["Matin complet","08:00","12:00",true],["Fin de matinée","10:00","12:00",true],["Après-midi complet","13:30","17:30",true]],2:[["Matin complet","08:00","12:00",true],["Fin de matinée","10:00","12:00",true],["Après-midi complet","13:30","17:30",true]],3:[["Matin complet","08:00","12:00",true],["Fin de matinée","10:00","12:00",true],["Après-midi complet","13:30","17:30",false]],4:[["Matin complet","08:00","12:00",true],["Fin de matinée","10:00","12:00",true],["Après-midi complet","13:30","17:30",true]],5:[["Matin complet","08:00","12:00",true],["Fin de matinée","10:00","12:00",true],["Après-midi complet","13:30","17:30",true]],6:[["Matin complet","08:00","12:00",true],["Fin de matinée","10:00","12:00",true],["Après-midi complet","13:30","17:30",false]]}}
-function emptyClient(){return{name:"",type:"CESU",address:"",email:"",phone:"",lat:null,lng:null,duration:4,priceMode:"visit",price:300,timePref:"Indifférent",placementMode:"normal",monthPosition:"Indifférent",minGap:7,allowedDays:[1,2,3,4,5,6],months:Array(12).fill(0),notes:"",updatedAt:new Date().toISOString()}}
+function defaultSlots(){return{1:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],2:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],3:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]],4:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],5:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],6:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]]}}
+function emptyClient(){return{name:"",type:"CESU",address:"",email:"",phone:"",lat:null,lng:null,duration:4,priceMode:"visit",price:300,placementMode:"matin",forcedStart:"12:00",forcedEnd:"14:00",monthPosition:"Indifférent",minGap:7,allowedDays:[1,2,3,4,5,6],months:Array(12).fill(0),notes:"",updatedAt:new Date().toISOString()}}
 
 async function loadAll(){let settings=await getAll("settings");state.settings=settings[0]||defaultSettings();if(!settings[0])await put("settings",state.settings);state.clients=await getAll("clients");renderAll();scheduleAutosave("chargement")}
 function renderAll(){buildSlots();buildMonths();renderSettings();renderClients();renderBackupStatus();updateAutoSaveHeader()}
 function buildSlots(){let wrap=document.getElementById("slots");wrap.innerHTML="";let slots=(state.settings&&state.settings.slots)||defaultSlots();for(let d=1;d<=6;d++){let html=`<div class="slot"><div class="slotTitle">${dayNames[d]}</div>`;(slots[d]||defaultSlots()[d]).forEach((s,i)=>{html+=`<label>${s[0]}</label><div class="row"><input id="slot_${d}_${i}_start" type="time" value="${s[1]}"><input id="slot_${d}_${i}_end" type="time" value="${s[2]}"></div><div class="toggle"><input id="slot_${d}_${i}_active" type="checkbox" ${s[3]?"checked":""}><span>${s[0]} travaillé</span></div>`});html+="</div>";wrap.innerHTML+=html}}
 function buildMonths(){let m=document.getElementById("months");m.innerHTML="";monthNames.forEach((mo,i)=>m.innerHTML+=`<div><label>${mo}</label><input id="m${i}" type="number" min="0" value="0"></div>`)}
 function renderSettings(){let s=state.settings;year.value=s.year;homeAddress.value=s.homeAddress||"";homeLat.value=s.homeLat??"";homeLng.value=s.homeLng??"";blockedDates.value=s.blockedDates||""}
-function getSlotsFromUI(){let out={};for(let d=1;d<=6;d++){out[d]=[];for(let i=0;i<3;i++){let def=defaultSlots()[d][i];out[d].push([def[0],document.getElementById(`slot_${d}_${i}_start`).value,document.getElementById(`slot_${d}_${i}_end`).value,document.getElementById(`slot_${d}_${i}_active`).checked])}}return out}
+function getSlotsFromUI(){let out={};for(let d=1;d<=6;d++){out[d]=[];for(let i=0;i<2;i++){let def=defaultSlots()[d][i];out[d].push([def[0],document.getElementById(`slot_${d}_${i}_start`).value,document.getElementById(`slot_${d}_${i}_end`).value,document.getElementById(`slot_${d}_${i}_active`).checked])}}return out}
 async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,slots:getSlotsFromUI(),updatedAt:new Date().toISOString()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés et sauvegarde automatique programmée.</div>'}
 async function applyDefaultSlots(){state.settings.slots=defaultSlots();await put("settings",state.settings);buildSlots();scheduleAutosave("planning type");homeStatus.innerHTML='<div class="ok">Planning type appliqué.</div>'}
 
@@ -204,13 +212,14 @@ async function geocodeAllClients(){let count=0;for(let c of state.clients){if(c.
 
 function checkedDays(){return Array.from(document.querySelectorAll("#allowedDays input:checked")).map(x=>parseInt(x.value))}
 function setCheckedDays(vals){document.querySelectorAll("#allowedDays input").forEach(x=>x.checked=vals.includes(parseInt(x.value)))}
-async function saveClient(){let c=emptyClient();let idx=parseInt(editIndex.value);if(idx>=0)c={...state.clients[idx]};c.name=clientName.value.trim();if(!c.name){alert("Nom obligatoire");return}c.type=clientType.value;c.address=address.value;c.email=email.value;c.phone=phone.value;c.lat=lat.value?parseFloat(lat.value):null;c.lng=lng.value?parseFloat(lng.value):null;c.duration=parseFloat(duration.value||"0");c.priceMode=priceMode.value;c.price=parseFloat(price.value||"0");c.timePref=timePref.value;c.placementMode=placementMode.value;c.monthPosition=monthPosition.value;c.minGap=parseInt(minGap.value||"7");c.allowedDays=checkedDays();c.months=monthNames.map((_,i)=>parseInt(document.getElementById("m"+i).value||"0"));c.notes=notes.value;c.updatedAt=new Date().toISOString();await put("clients",c);state.clients=await getAll("clients");resetClientForm();renderClients();scheduleAutosave("client")}
-function resetClientForm(){editIndex.value=-1;["clientName","address","email","phone","lat","lng","notes"].forEach(id=>document.getElementById(id).value="");clientType.value="CESU";duration.value=4;priceMode.value="visit";price.value=300;timePref.value="Indifférent";placementMode.value="normal";monthPosition.value="Indifférent";minGap.value=7;monthNames.forEach((_,i)=>document.getElementById("m"+i).value=0);setCheckedDays([1,2,3,4,5,6])}
-function editClient(i){let c=state.clients[i];editIndex.value=i;clientName.value=c.name||"";clientType.value=c.type||"CESU";address.value=c.address||"";email.value=c.email||"";phone.value=c.phone||"";lat.value=c.lat??"";lng.value=c.lng??"";duration.value=c.duration||4;priceMode.value=c.priceMode||"visit";price.value=c.price||300;timePref.value=c.timePref||"Indifférent";placementMode.value=c.placementMode||"normal";monthPosition.value=c.monthPosition||"Indifférent";minGap.value=c.minGap||7;notes.value=c.notes||"";(c.months||Array(12).fill(0)).forEach((v,i)=>document.getElementById("m"+i).value=v);setCheckedDays(c.allowedDays||[1,2,3,4,5,6]);window.scrollTo(0,0)}
+async function saveClient(){let c=emptyClient();let idx=parseInt(editIndex.value);if(idx>=0)c={...state.clients[idx]};c.name=clientName.value.trim();if(!c.name){alert("Nom obligatoire");return}c.type=clientType.value;c.address=address.value;c.email=email.value;c.phone=phone.value;c.lat=lat.value?parseFloat(lat.value):null;c.lng=lng.value?parseFloat(lng.value):null;c.duration=parseFloat(duration.value||"0");c.priceMode=priceMode.value;c.price=parseFloat(price.value||"0");c.placementMode=placementMode.value;c.forcedStart=forcedStart.value;c.forcedEnd=forcedEnd.value;c.monthPosition=monthPosition.value;c.minGap=parseInt(minGap.value||"7");c.allowedDays=checkedDays();c.months=monthNames.map((_,i)=>parseInt(document.getElementById("m"+i).value||"0"));c.notes=notes.value;c.updatedAt=new Date().toISOString();await put("clients",c);state.clients=await getAll("clients");resetClientForm();renderClients();scheduleAutosave("client")}
+function resetClientForm(){editIndex.value=-1;["clientName","address","email","phone","lat","lng","notes"].forEach(id=>document.getElementById(id).value="");clientType.value="CESU";duration.value=4;priceMode.value="visit";price.value=300;placementMode.value="matin";forcedStart.value="12:00";forcedEnd.value="14:00";monthPosition.value="Indifférent";minGap.value=7;monthNames.forEach((_,i)=>document.getElementById("m"+i).value=0);setCheckedDays([1,2,3,4,5,6])}
+function editClient(i){let c=state.clients[i];editIndex.value=i;clientName.value=c.name||"";clientType.value=(c.type==="Entreprise"?"Entreprise":"CESU");address.value=c.address||"";email.value=c.email||"";phone.value=c.phone||"";lat.value=c.lat??"";lng.value=c.lng??"";duration.value=c.duration||4;priceMode.value=c.priceMode||"visit";price.value=c.price||300;placementMode.value=c.placementMode||"matin";forcedStart.value=c.forcedStart||"12:00";forcedEnd.value=c.forcedEnd||"14:00";monthPosition.value=c.monthPosition||"Indifférent";minGap.value=c.minGap||7;notes.value=c.notes||"";(c.months||Array(12).fill(0)).forEach((v,i)=>document.getElementById("m"+i).value=v);setCheckedDays(c.allowedDays||[1,2,3,4,5,6]);window.scrollTo(0,0)}
 async function deleteClient(i){if(confirm("Supprimer ce client ?")){await del("clients",state.clients[i].id);state.clients=await getAll("clients");renderClients();scheduleAutosave("suppression client")}}
 function revenue(c,n){return c.priceMode==="hour"?c.price*c.duration*n:c.price*n}
 function visits(c){return (c.months||[]).reduce((a,b)=>a+b,0)}
-function renderClients(){let html="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{html+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.duration} h</span><span class="badge">${c.placementMode||"normal"}</span><span class="badge">${visits(c)} pass/an</span><span class="badge">${revenue(c,visits(c)).toFixed(0)} €</span><br><span class="small">${c.address||""}</span><br><button onclick="editClient(${i})">Modifier</button><button class="danger" onclick="deleteClient(${i})">Supprimer</button></div>`});clientList.innerHTML=html||'<p class="small">Aucun client.</p>'}
+function renderClients(){let html="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{html+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.duration} h</span><span class="badge">${labelPlacement(c)}</span><span class="badge">${visits(c)} pass/an</span><span class="badge">${revenue(c,visits(c)).toFixed(0)} €</span><br><span class="small">${c.address||""}</span><br><button onclick="editClient(${i})">Modifier</button><button class="danger" onclick="deleteClient(${i})">Supprimer</button></div>`});clientList.innerHTML=html||'<p class="small">Aucun client.</p>'}
+function labelPlacement(c){if(c.placementMode==="hors_horaires")return `Forcé ${c.forcedStart}-${c.forcedEnd}`;if(c.placementMode==="apresmidi")return "Après-midi";if(c.placementMode==="indifferent")return "Indifférent";return "Matin"}
 function parseVCF(text){let cards=text.split(/BEGIN:VCARD/i).slice(1),out=[];for(let raw of cards){let lines=raw.replace(/\r?\n[ \t]/g,"").split(/\r?\n/),c=emptyClient();for(let line of lines){line=line.trim();if(line.startsWith("FN:"))c.name=line.substring(3);else if(line.includes("EMAIL")&&line.includes(":"))c.email=line.split(":").slice(1).join(":");else if(line.includes("TEL")&&line.includes(":"))c.phone=line.split(":").slice(1).join(":");else if(line.includes("ADR")&&line.includes(":")){let adr=line.split(":").slice(1).join(":").replace(/;/g," ").replace(/\s+/g," ").trim();if(adr)c.address=adr}}if(c.name)out.push(c)}return out}
 async function importVCF(e){let f=e.target.files[0];if(!f)return;let reader=new FileReader();reader.onload=async ev=>{let imported=parseVCF(ev.target.result);let count=0;for(let c of imported){let exists=state.clients.some(x=>(x.name||"").toLowerCase()===(c.name||"").toLowerCase());if(!exists){await put("clients",c);count++}}state.clients=await getAll("clients");renderClients();scheduleAutosave("import contacts");importStatus.innerHTML=`<div class="ok">${count} contact(s) importé(s).</div>`};reader.readAsText(f)}
 
@@ -224,26 +233,22 @@ function slotHours(s){return Math.max(0,(mins(s[2])-mins(s[1]))/60)}
 function used(date,slotIndex){return state.planning.filter(p=>p.date===date&&p.slotIndex===slotIndex).reduce((a,p)=>a+p.duration,0)}
 function dist(a,b,c,d){if(!a||!b||!c||!d)return 9999;let R=6371,la=(c-a)*Math.PI/180,lo=(d-b)*Math.PI/180,x=Math.sin(la/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(lo/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 function geo(date,c){let same=state.planning.filter(p=>p.date===date&&p.lat&&p.lng);if(!same.length)return dist(state.settings.homeLat,state.settings.homeLng,c.lat,c.lng);return Math.min(...same.map(p=>dist(p.lat,p.lng,c.lat,c.lng)))}
-function slotCompatible(c,s){
- let label=s[0];
- if(c.placementMode==="normal") return label.includes("complet") && slotHours(s)>=c.duration;
- if(c.placementMode==="court") return slotHours(s)>=c.duration;
- if(c.placementMode==="fin_matin") return label.includes("Fin de matinée") || (mins(s[1])>=600 && mins(s[2])<=720);
- if(c.placementMode==="debut_matin") return label.includes("Matin") && mins(s[1])<=480;
- if(c.placementMode==="souple") return slotHours(s)>=c.duration;
- return slotHours(s)>=c.duration;
+function forcedHours(c){return Math.max(0,(mins(c.forcedEnd)-mins(c.forcedStart))/60)}
+function compatibleSlots(c,dow){
+ let slots=state.settings.slots[dow]||[];
+ if(c.placementMode==="hors_horaires"){return [[`Forcé ${c.forcedStart}-${c.forcedEnd}`,c.forcedStart,c.forcedEnd,true,"forced"]]}
+ return slots.map((s,i)=>[s[0],s[1],s[2],s[3],String(i)]).filter(s=>{
+   if(!s[3])return false;
+   if(slotHours(s)<c.duration)return false;
+   if(c.placementMode==="matin")return s[0]==="Matin";
+   if(c.placementMode==="apresmidi")return s[0]==="Après-midi";
+   return true;
+ });
 }
-function timeCompatible(c,s){
- if(c.timePref==="Indifférent") return true;
- if(c.timePref==="Matin") return mins(s[2])<=720 || s[0].includes("Matin");
- if(c.timePref==="Après-midi") return mins(s[1])>=720 || s[0].includes("Après-midi");
- if(c.timePref==="Fin de matinée") return s[0].includes("Fin de matinée") || (mins(s[1])>=600 && mins(s[2])<=720);
- if(c.timePref==="Début de matinée") return s[0].includes("Matin") && mins(s[1])<=480;
- return true;
-}
-async function generatePlanning(){await saveSettingsNow(false);state.planning=[];let jobs=[];state.clients.forEach(c=>(c.months||[]).forEach((n,mi)=>{for(let k=0;k<n;k++)jobs.push({c,mi,k})}));jobs.sort((a,b)=>((a.c.allowedDays||[]).length+(a.c.timePref==="Indifférent"?2:0))-((b.c.allowedDays||[]).length+(b.c.timePref==="Indifférent"?2:0)));let blocked=blockedSet(),year=state.settings.year;for(let j of jobs){let c=j.c,dates=candDates(year,j.mi,c.monthPosition);if(j.k>0)dates=dates.concat(candDates(year,j.mi,"Indifférent"));let poss=[];for(let d of dates){let iso=toISO(d),dow=d.getDay();if(dow===0||blocked.has(iso)||!(c.allowedDays||[]).includes(dow)||!gapOK(c,iso))continue;let slots=state.settings.slots[dow]||[];slots.forEach((s,idx)=>{if(!s[3])return;if(!slotCompatible(c,s))return;if(!timeCompatible(c,s))return;if(used(iso,idx)+c.duration<=slotHours(s))poss.push({date:iso,slot:s,slotIndex:idx,score:geo(iso,c)+(c.placementMode==="fin_matin"&&s[0].includes("Fin")?-2:0)})})}poss.sort((a,b)=>a.score-b.score||a.date.localeCompare(b.date));if(poss.length){let p=poss[0];state.planning.push({date:p.date,slot:`${p.slot[0]} ${p.slot[1]}-${p.slot[2]}`,slotIndex:p.slotIndex,client:c.name,type:c.type,duration:c.duration,revenue:revenue(c,1),address:c.address,lat:c.lat,lng:c.lng})}else state.planning.push({date:"NON PLACÉ",slot:"",slotIndex:-1,client:c.name,type:c.type,duration:c.duration,revenue:revenue(c,1),address:c.address,lat:c.lat,lng:c.lng})}state.planning.sort((a,b)=>a.date.localeCompare(b.date)||a.slot.localeCompare(b.slot));renderPlanning();scheduleAutosave("planning")}
+async function generatePlanning(){await saveSettingsNow(false);state.planning=[];let jobs=[];state.clients.forEach(c=>(c.months||[]).forEach((n,mi)=>{for(let k=0;k<n;k++)jobs.push({c,mi,k})}));jobs.sort((a,b)=>((a.c.allowedDays||[]).length+(a.c.placementMode==="indifferent"?2:0))-((b.c.allowedDays||[]).length+(b.c.placementMode==="indifferent"?2:0)));let blocked=blockedSet(),year=state.settings.year;for(let j of jobs){let c=j.c,dates=candDates(year,j.mi,c.monthPosition);if(j.k>0)dates=dates.concat(candDates(year,j.mi,"Indifférent"));let poss=[];for(let d of dates){let iso=toISO(d),dow=d.getDay();if(dow===0||blocked.has(iso)||!(c.allowedDays||[]).includes(dow)||!gapOK(c,iso))continue;compatibleSlots(c,dow).forEach(s=>{let key=s[4];if(used(iso,key)+c.duration<=slotHours(s))poss.push({date:iso,slot:s,slotKey:key,score:geo(iso,c)})})}poss.sort((a,b)=>a.score-b.score||a.date.localeCompare(b.date));if(poss.length){let p=poss[0];state.planning.push({date:p.date,slot:`${p.slot[0]} ${p.slot[1]}-${p.slot[2]}`,slotKey:p.slotKey,client:c.name,type:c.type,duration:c.duration,revenue:revenue(c,1),address:c.address,lat:c.lat,lng:c.lng})}else state.planning.push({date:"NON PLACÉ",slot:"",slotKey:"",client:c.name,type:c.type,duration:c.duration,revenue:revenue(c,1),address:c.address,lat:c.lat,lng:c.lng})}state.planning.sort((a,b)=>a.date.localeCompare(b.date)||a.slot.localeCompare(b.slot));renderPlanning();scheduleAutosave("planning")}
 function renderPlanning(){let total=state.planning.filter(p=>p.date!=="NON PLACÉ").reduce((a,p)=>a+p.revenue,0),cesu=state.planning.filter(p=>p.date!=="NON PLACÉ"&&p.type==="CESU").reduce((a,p)=>a+p.revenue,0),non=state.planning.filter(p=>p.date==="NON PLACÉ").length;summary.innerHTML=`<div class="${non?'warn':'ok'}">CA placé : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Autres : <b>${(total-cesu).toFixed(0)} €</b><br>Non placés : <b>${non}</b></div>`;let html="<table><tr><th>Date</th><th>Créneau</th><th>Client</th><th>Type</th><th>Durée</th><th>CA</th></tr>";state.planning.forEach(p=>html+=`<tr><td>${p.date}</td><td>${p.slot}</td><td>${p.client}</td><td>${p.type}</td><td>${p.duration} h</td><td>${p.revenue.toFixed(0)}€</td></tr>`);html+="</table>";planningTable.innerHTML=html}
 
+function printPlanning(){showTab("planning");setTimeout(()=>window.print(),200)}
 function backupObject(){return{app:"Un Coup de Pousse PWA",version:1,exportedAt:new Date().toISOString(),settings:state.settings,clients:state.clients,planning:state.planning}}
 let autosaveTimer=null;
 function scheduleAutosave(reason){if(autosaveTimer)clearTimeout(autosaveTimer);autosaveHeader.innerText="Auto-sauvegarde en attente…";autosaveTimer=setTimeout(()=>autoSave(reason),800)}
