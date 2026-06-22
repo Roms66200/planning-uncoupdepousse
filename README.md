@@ -1,10 +1,8 @@
-# UCDP Planning V6
+# UCDP Planning V8
 
 Ajouts :
-- Passages exceptionnels en plus de la règle principale.
-- Exemple : toutes les 3 semaines de mars à octobre + 1 passage 8h en novembre.
-- Onglet Carte avec liens Apple Plans / Google Maps.
-- Cache versionné V6.
-
-Limite :
-- La sauvegarde iCloud automatique directe n’est pas possible depuis une PWA seule. Utiliser Export JSON vers iCloud Drive ou prévoir serveur/NAS.
+- Clé API OpenRouteService dans Réglages.
+- Calcul km route réel par journée.
+- Optimisation de l’ordre de tournée d’une journée.
+- Lien itinéraire complet Apple Plans / Google Maps.
+- Repli automatique sur distance GPS approximative si API absente.

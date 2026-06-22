@@ -25,23 +25,30 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 .monthGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}.dayCell{background:#fff;border:1px solid #ddd;min-height:76px;padding:4px;font-size:11px}.dayNum{font-weight:800}.event{background:#e9f7ec;border-radius:6px;margin-top:3px;padding:3px}
 @media print{header,.tabs,button,#backup,#clients,#home,#turnover,#map{display:none!important}body{background:#fff}main{padding:0;max-width:none}.card{box-shadow:none;border-radius:0;margin:0}#planning{display:block!important}}
 @media(max-width:430px){.row{grid-template-columns:1fr}.months{grid-template-columns:repeat(2,1fr)}.tabs{grid-template-columns:repeat(3,1fr)}}
+
+.editPanel{border:1px solid #ddd;border-radius:16px;padding:12px;margin:10px 0;background:#fafafa}
+.locked{background:#fff4d6}
+@media print{#clientPdfPrint{display:block!important}#planning:not(.printActive){display:none!important}}
+
 </style>
 </head>
 <body>
 <header>
 <h1>Un Coup de Pousse — Planning</h1>
-<div class="status" id="autosaveHeader">Version 6</div>
+<div class="status" id="autosaveHeader">Version 8</div>
 <div class="tabs">
 <button onclick="showTab('home')">Accueil</button><button onclick="showTab('clients')">Clients</button><button onclick="showTab('planning')">Planning</button><button onclick="showTab('turnover')">CA</button><button onclick="showTab('map')">Carte</button><button onclick="showTab('backup')">Sauvegarde</button>
 </div>
 </header>
 <main>
 <section id="home" class="card">
-<h2>Accueil / Réglages</h2><div class="ok"><b>Version 6 installée</b> — fréquences spéciales, passages exceptionnels, 2h/4h/8h, clients voisins, calendrier, CA global et carte.</div>
+<h2>Accueil / Réglages</h2><div class="ok"><b>Version 8 installée</b> — fréquences spéciales, optimisation de tournée OpenRouteService, planning modifiable, PDF client, email, vue semaine et carte.</div>
 <div class="row"><div><label>Année</label><input id="year" type="number" value="2027"></div><div><label>Adresse départ</label><input id="homeAddress" placeholder="Montescot, France"></div></div>
 <div class="row"><div><label>Latitude départ</label><input id="homeLat" type="number" step="0.000001"></div><div><label>Longitude départ</label><input id="homeLng" type="number" step="0.000001"></div></div>
+<label>Clé API OpenRouteService</label><input id="orsApiKey" placeholder="Colle ta clé OpenRouteService ici">
+<p class="small">Cette clé sert à calculer les kilomètres réels par la route. Sans clé, l’app utilise seulement la proximité GPS approximative.</p>
 <button onclick="geocodeHome()">Trouver GPS départ</button>
-<h3>Horaires de travail</h3><div id="slots"></div><button onclick="applyDefaultSlots()">Planning type</button><button onclick="saveSettingsNow()">Enregistrer</button>
+<h3>Horaires de travail</h3><div id="slots"></div><button onclick="applyDefaultSlots()">Planning type</button><button onclick="addFrenchHolidays()">Ajouter jours fériés</button><button onclick="saveSettingsNow()">Enregistrer</button>
 <label>Congés / jours bloqués</label><textarea id="blockedDates" placeholder="2027-08-01 à 2027-08-15&#10;2027-12-25"></textarea><div id="homeStatus"></div>
 </section>
 
@@ -57,7 +64,7 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <div class="row"><div><label>Mode tarif</label><select id="priceMode"><option value="hour">Horaire</option><option value="visit">Forfait passage</option><option value="halfday">Demi-journée</option><option value="day">Journée</option></select></div><div><label>Tarif (€)</label><input id="price" type="number" value="300"></div></div>
 <div class="row"><div><label>Placement</label><select id="placementMode"><option value="matin">Matin</option><option value="apresmidi">Après-midi</option><option value="indifferent">Indifférent</option><option value="forcer">Forcer horaire précis</option></select></div><div><label>Période du mois</label><select id="monthPosition"><option>Indifférent</option><option>Début</option><option>Milieu</option><option>Fin</option></select></div></div>
 <div class="slot"><b>Horaire forcé</b><div class="row"><div><label>Début</label><input id="forcedStart" type="time" value="12:00"></div><div><label>Fin</label><input id="forcedEnd" type="time" value="14:00"></div></div></div>
-<label>Groupe voisin / clients liés</label><input id="linkedGroup" placeholder="Ex : Rue des Oliviers"><p class="small">Même groupe = priorité pour être placés le même jour.</p>
+<label>Groupe voisin / clients liés</label><input id="linkedGroup" placeholder="Ex : Rue des Oliviers"><p class="small">Même groupe = priorité pour être placés le même jour.</p><label>Ordre voisin</label><select id="neighborOrder"><option value="">Indifférent</option><option value="before">Avant les autres du groupe</option><option value="after">Après les autres du groupe</option></select>
 <label>Mode de fréquence</label><select id="frequencyMode" onchange="toggleFrequencyMode()"><option value="monthly">Nombre de passages par mois</option><option value="interval">Toutes les X semaines</option><option value="special">Spécial mois par mois</option></select>
 <div id="monthlyBox"><label>Passages par mois</label><div class="months" id="monthlyVisits"></div></div>
 <div id="intervalBox" class="slot hidden"><b>Toutes les X semaines</b><div class="row"><div><label>Mois début</label><select id="intervalStartMonth"></select></div><div><label>Mois fin</label><select id="intervalEndMonth"></select></div></div><div class="row"><div><label>Fréquence</label><select id="intervalWeeks"><option value="2">Toutes les 2 semaines</option><option value="3" selected>Toutes les 3 semaines</option><option value="4">Toutes les 4 semaines</option></select></div><div><label>Durée</label><select id="intervalDuration"><option value="2">2 h</option><option value="4" selected>4 h</option><option value="8">8 h</option></select></div></div></div>
@@ -77,8 +84,32 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 
 <section id="planning" class="card hidden">
 <h2>Planning</h2>
-<div class="row"><div><label>Mois calendrier</label><select id="calendarMonth" onchange="renderCalendar()"></select></div><div><label>Vue</label><select id="viewMode" onchange="renderPlanning()"><option value="table">Tableau</option><option value="calendar">Calendrier</option></select></div></div>
+<div class="row"><div><label>Mois / semaine</label><select id="calendarMonth" onchange="renderPlanning()"></select></div><div><label>Vue</label><select id="viewMode" onchange="renderPlanning()"><option value="table">Tableau</option><option value="calendar">Calendrier mois</option><option value="week">Vue semaine</option></select></div></div>
 <button onclick="generatePlanning()">Générer l’année</button><button class="light" onclick="exportPlanningCSV()">Export CSV</button><button class="light" onclick="printPlanning()">PDF / imprimer</button>
+
+<div class="slot">
+<b>Modifier un rendez-vous</b>
+<p class="small">Sélectionne un rendez-vous généré, puis change la date ou le créneau. Tu peux aussi le verrouiller pour éviter de le perdre.</p>
+<div class="row">
+<div><label>Rendez-vous</label><select id="editVisitSelect" onchange="loadVisitEdit()"></select></div>
+<div><label>Nouvelle date</label><input id="editVisitDate" type="date"></div>
+</div>
+<div class="row">
+<div><label>Créneau</label><input id="editVisitSlot" placeholder="Matin 08:00-12:00"></div>
+<div><label>Verrouillé</label><select id="editVisitLocked"><option value="false">Non</option><option value="true">Oui</option></select></div>
+</div>
+<button onclick="applyVisitEdit()">Appliquer</button>
+</div>
+
+<div class="slot">
+<b>Planning client / email</b>
+<div class="row">
+<div><label>Client</label><select id="clientPdfSelect"></select></div>
+<div><label>Action</label><select id="clientAction"><option value="pdf">PDF / imprimer</option><option value="mail">Préparer email</option></select></div>
+</div>
+<button onclick="clientActionRun()">Lancer</button>
+<div id="clientPdfPrint" class="hidden"></div>
+</div>
 <div id="summary"></div><div id="planningTable" class="tablewrap"></div><div id="calendarView"></div>
 </section>
 
@@ -92,6 +123,9 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <div><label>Application</label><select id="mapApp" onchange="renderMapLinks()"><option value="apple">Apple Plans</option><option value="google">Google Maps</option></select></div>
 </div>
 <button onclick="renderMapLinks()">Actualiser la carte</button>
+<button onclick="optimizeSelectedDayRoute()">Optimiser cette journée</button>
+<button class="light" onclick="calculateRouteStats()">Calculer km réels</button>
+<div id="routeStats"></div>
 <div id="mapLinks"></div>
 </section>
 
@@ -99,24 +133,24 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 </main>
 
 <script>
-const APP_VERSION="6.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
+const APP_VERSION="8.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
 let db=null,state={settings:null,clients:[],planning:[]};
 const monthNames=["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"],dayNames={1:"Lundi",2:"Mardi",3:"Mercredi",4:"Jeudi",5:"Vendredi",6:"Samedi"};
 function showTab(id){["home","clients","planning","turnover","map","backup"].forEach(x=>document.getElementById(x).classList.add("hidden"));document.getElementById(id).classList.remove("hidden");if(id==="backup")renderBackupStatus();if(id==="turnover")renderTurnover();if(id==="planning")renderPlanning();if(id==="map")renderMapLinks()}
 function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=e=>{let d=e.target.result;if(!d.objectStoreNames.contains("settings"))d.createObjectStore("settings",{keyPath:"id"});if(!d.objectStoreNames.contains("clients"))d.createObjectStore("clients",{keyPath:"id",autoIncrement:true});if(!d.objectStoreNames.contains("autosaves"))d.createObjectStore("autosaves",{keyPath:"id"})};r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=e=>rej(e)})}
 function tx(s,m="readonly"){return db.transaction(s,m).objectStore(s)}function getAll(s){return new Promise(res=>{let r=tx(s).getAll();r.onsuccess=()=>res(r.result||[])})}function put(s,o){return new Promise(res=>{let r=tx(s,"readwrite").put(o);r.onsuccess=()=>res(r.result)})}function del(s,k){return new Promise(res=>{let r=tx(s,"readwrite").delete(k);r.onsuccess=()=>res()})}function clearStore(s){return new Promise(res=>{let r=tx(s,"readwrite").clear();r.onsuccess=()=>res()})}
 function defaultSlots(){return{1:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],2:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],3:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]],4:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],5:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],6:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]]}}
-function defaultSettings(){return{id:"main",year:2027,homeAddress:"",homeLat:null,homeLng:null,blockedDates:"",slots:defaultSlots()}}
-function emptyClient(){return{name:"",type:"CESU",address:"",email:"",phone:"",lat:null,lng:null,defaultDuration:4,priceMode:"visit",price:300,placementMode:"matin",forcedStart:"12:00",forcedEnd:"14:00",linkedGroup:"",frequencyMode:"monthly",monthlyVisits:Array(12).fill(0),monthlyDurations:Array(12).fill(4),intervalStartMonth:2,intervalEndMonth:9,intervalWeeks:3,intervalDuration:4,specialMonths:Array.from({length:12},()=>({visits:0,duration:4})),exceptionMonths:Array.from({length:12},()=>({visits:0,duration:8})),monthPosition:"Indifférent",minGap:7,allowedDays:[1,2,3,4,5,6],notes:""}}
+function defaultSettings(){return{id:"main",year:2027,homeAddress:"",homeLat:null,homeLng:null,blockedDates:"",orsApiKey:"",slots:defaultSlots()}}
+function emptyClient(){return{name:"",type:"CESU",address:"",email:"",phone:"",lat:null,lng:null,defaultDuration:4,priceMode:"visit",price:300,placementMode:"matin",forcedStart:"12:00",forcedEnd:"14:00",linkedGroup:"",neighborOrder:"",frequencyMode:"monthly",monthlyVisits:Array(12).fill(0),monthlyDurations:Array(12).fill(4),intervalStartMonth:2,intervalEndMonth:9,intervalWeeks:3,intervalDuration:4,specialMonths:Array.from({length:12},()=>({visits:0,duration:4})),exceptionMonths:Array.from({length:12},()=>({visits:0,duration:8})),monthPosition:"Indifférent",minGap:7,allowedDays:[1,2,3,4,5,6],notes:""}}
 function migrateClient(c){let n={...emptyClient(),...c};if(c.months&&!c.monthlyVisits)n.monthlyVisits=c.months;if(c.duration&&!c.defaultDuration)n.defaultDuration=c.duration;if(n.type!=="Entreprise")n.type="CESU";if(!n.specialMonths)n.specialMonths=Array.from({length:12},(_,i)=>({visits:n.monthlyVisits?.[i]||0,duration:n.defaultDuration||4}));if(!n.exceptionMonths)n.exceptionMonths=Array.from({length:12},()=>({visits:0,duration:8}));return n}
 async function loadAll(){let s=await getAll("settings");state.settings=s[0]||defaultSettings();if(!s[0])await put("settings",state.settings);state.clients=(await getAll("clients")).map(migrateClient);renderAll();scheduleAutosave("chargement")}
 function renderAll(){buildSlots();buildMonths();buildCalendarMonth();renderSettings();renderClients();renderBackupStatus();updateAutoSaveHeader()}
 function buildSlots(){let w=slots;w.innerHTML="";let sl=state.settings?.slots||defaultSlots();for(let d=1;d<=6;d++){let h=`<div class="slot"><b>${dayNames[d]}</b>`;(sl[d]||defaultSlots()[d]).slice(0,2).forEach((s,i)=>{let n=i===0?"Matin":"Après-midi";h+=`<label>${n}</label><div class="row"><input id="slot_${d}_${i}_start" type="time" value="${s[1]}"><input id="slot_${d}_${i}_end" type="time" value="${s[2]}"></div><label><input id="slot_${d}_${i}_active" type="checkbox" ${s[3]?"checked":""}> ${n} actif</label>`});w.innerHTML+=h+"</div>"}}
 function buildMonths(){monthlyVisits.innerHTML="";specialMonths.innerHTML="";exceptionMonths.innerHTML="";monthNames.forEach((m,i)=>{monthlyVisits.innerHTML+=`<div><label>${m}</label><input id="mv${i}" type="number" min="0" max="4" value="0"></div>`;specialMonths.innerHTML+=`<div class="row"><div><label>${m} passages</label><input id="spv${i}" type="number" min="0" max="4" value="0"></div><div><label>${m} durée</label><select id="spd${i}"><option value="2">2 h</option><option value="4" selected>4 h</option><option value="8">8 h</option></select></div></div>`;exceptionMonths.innerHTML+=`<div class="row"><div><label>${m} extra</label><input id="exv${i}" type="number" min="0" max="4" value="0"></div><div><label>${m} durée extra</label><select id="exd${i}"><option value="2">2 h</option><option value="4">4 h</option><option value="8" selected>8 h</option></select></div></div>`})}
 function buildCalendarMonth(){calendarMonth.innerHTML=intervalStartMonth.innerHTML=intervalEndMonth.innerHTML="";monthNames.forEach((m,i)=>{calendarMonth.innerHTML+=`<option value="${i}">${m}</option>`;intervalStartMonth.innerHTML+=`<option value="${i}">${m}</option>`;intervalEndMonth.innerHTML+=`<option value="${i}">${m}</option>`})}
-function renderSettings(){let s=state.settings;year.value=s.year;homeAddress.value=s.homeAddress||"";homeLat.value=s.homeLat??"";homeLng.value=s.homeLng??"";blockedDates.value=s.blockedDates||""}
+function renderSettings(){let s=state.settings;year.value=s.year;homeAddress.value=s.homeAddress||"";homeLat.value=s.homeLat??"";homeLng.value=s.homeLng??"";blockedDates.value=s.blockedDates||"";orsApiKey.value=s.orsApiKey||""}
 function getSlotsFromUI(){let out={};for(let d=1;d<=6;d++){out[d]=[];for(let i=0;i<2;i++){let n=i===0?"Matin":"Après-midi";out[d].push([n,document.getElementById(`slot_${d}_${i}_start`).value,document.getElementById(`slot_${d}_${i}_end`).value,document.getElementById(`slot_${d}_${i}_active`).checked])}}return out}
-async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,slots:getSlotsFromUI()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés.</div>'}
+async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,orsApiKey:orsApiKey.value.trim(),slots:getSlotsFromUI()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés.</div>'}
 async function applyDefaultSlots(){state.settings.slots=defaultSlots();await put("settings",state.settings);buildSlots();scheduleAutosave("planning type");homeStatus.innerHTML='<div class="ok">Planning type appliqué.</div>'}
 function toggleFrequencyMode(){monthlyBox.classList.toggle("hidden",frequencyMode.value!=="monthly");intervalBox.classList.toggle("hidden",frequencyMode.value!=="interval");specialBox.classList.toggle("hidden",frequencyMode.value!=="special")}
 async function geocodeAddress(a){if(!a||a.trim().length<5){alert("Adresse trop courte");return null}try{let r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=fr&q="+encodeURIComponent(a));let d=await r.json();if(!d.length){alert("Adresse non trouvée");return null}return{lat:+d[0].lat,lng:+d[0].lon}}catch(e){alert("Connexion nécessaire");return null}}
@@ -124,13 +158,13 @@ async function geocodeHome(){let r=await geocodeAddress(homeAddress.value);if(r)
 async function geocodeClient(){let r=await geocodeAddress(address.value);if(r){lat.value=r.lat.toFixed(6);lng.value=r.lng.toFixed(6)}}
 async function geocodeAllClients(){let cpt=0;for(let c of state.clients){if(c.address&&(!c.lat||!c.lng)){let r=await geocodeAddress(c.address);if(r){c.lat=r.lat;c.lng=r.lng;await put("clients",c);cpt++}await new Promise(r=>setTimeout(r,1200))}}state.clients=await getAll("clients");renderClients();scheduleAutosave("gps clients");importStatus.innerHTML=`<div class="ok">${cpt} client(s) géocodé(s).</div>`}
 function checkedDays(){return Array.from(document.querySelectorAll("#allowedDays input:checked")).map(x=>+x.value)}function setCheckedDays(v){document.querySelectorAll("#allowedDays input").forEach(x=>x.checked=v.includes(+x.value))}
-async function saveClient(){let c=emptyClient(),i=+editIndex.value;if(i>=0)c={...state.clients[i]};c.name=clientName.value.trim();if(!c.name){alert("Nom obligatoire");return}["type","address","email","phone","priceMode","placementMode","forcedStart","forcedEnd","linkedGroup","frequencyMode","monthPosition","notes"].forEach(k=>c[k]=document.getElementById(k).value);c.lat=lat.value?+lat.value:null;c.lng=lng.value?+lng.value:null;c.defaultDuration=+defaultDuration.value;c.price=+price.value||0;c.monthlyVisits=monthNames.map((_,i)=>+document.getElementById("mv"+i).value||0);c.intervalStartMonth=+intervalStartMonth.value;c.intervalEndMonth=+intervalEndMonth.value;c.intervalWeeks=+intervalWeeks.value;c.intervalDuration=+intervalDuration.value;c.specialMonths=monthNames.map((_,i)=>({visits:+document.getElementById("spv"+i).value||0,duration:+document.getElementById("spd"+i).value}));c.exceptionMonths=monthNames.map((_,i)=>({visits:+document.getElementById("exv"+i).value||0,duration:+document.getElementById("exd"+i).value}));c.minGap=+minGap.value||7;c.allowedDays=checkedDays();await put("clients",c);state.clients=await getAll("clients");resetClientForm();renderClients();scheduleAutosave("client")}
+async function saveClient(){let c=emptyClient(),i=+editIndex.value;if(i>=0)c={...state.clients[i]};c.name=clientName.value.trim();if(!c.name){alert("Nom obligatoire");return}["type","address","email","phone","priceMode","placementMode","forcedStart","forcedEnd","linkedGroup","neighborOrder","frequencyMode","monthPosition","notes"].forEach(k=>c[k]=document.getElementById(k).value);c.lat=lat.value?+lat.value:null;c.lng=lng.value?+lng.value:null;c.defaultDuration=+defaultDuration.value;c.price=+price.value||0;c.monthlyVisits=monthNames.map((_,i)=>+document.getElementById("mv"+i).value||0);c.intervalStartMonth=+intervalStartMonth.value;c.intervalEndMonth=+intervalEndMonth.value;c.intervalWeeks=+intervalWeeks.value;c.intervalDuration=+intervalDuration.value;c.specialMonths=monthNames.map((_,i)=>({visits:+document.getElementById("spv"+i).value||0,duration:+document.getElementById("spd"+i).value}));c.exceptionMonths=monthNames.map((_,i)=>({visits:+document.getElementById("exv"+i).value||0,duration:+document.getElementById("exd"+i).value}));c.minGap=+minGap.value||7;c.allowedDays=checkedDays();await put("clients",c);state.clients=await getAll("clients");resetClientForm();renderClients();scheduleAutosave("client")}
 function resetClientForm(){editIndex.value=-1;["clientName","address","email","phone","lat","lng","notes","linkedGroup"].forEach(id=>document.getElementById(id).value="");clientType.value="CESU";defaultDuration.value=4;priceMode.value="visit";price.value=300;placementMode.value="matin";forcedStart.value="12:00";forcedEnd.value="14:00";frequencyMode.value="monthly";toggleFrequencyMode();intervalStartMonth.value=2;intervalEndMonth.value=9;intervalWeeks.value=3;intervalDuration.value=4;monthPosition.value="Indifférent";minGap.value=7;monthNames.forEach((_,i)=>{document.getElementById("mv"+i).value=0;document.getElementById("spv"+i).value=0;document.getElementById("spd"+i).value=4;document.getElementById("exv"+i).value=0;document.getElementById("exd"+i).value=8});setCheckedDays([1,2,3,4,5,6])}
-function editClient(i){let c=migrateClient(state.clients[i]);editIndex.value=i;clientName.value=c.name||"";clientType.value=c.type;address.value=c.address||"";email.value=c.email||"";phone.value=c.phone||"";lat.value=c.lat??"";lng.value=c.lng??"";defaultDuration.value=c.defaultDuration;priceMode.value=c.priceMode;price.value=c.price;placementMode.value=c.placementMode;forcedStart.value=c.forcedStart;forcedEnd.value=c.forcedEnd;linkedGroup.value=c.linkedGroup||"";frequencyMode.value=c.frequencyMode;toggleFrequencyMode();c.monthlyVisits.forEach((v,i)=>document.getElementById("mv"+i).value=v);intervalStartMonth.value=c.intervalStartMonth;intervalEndMonth.value=c.intervalEndMonth;intervalWeeks.value=c.intervalWeeks;intervalDuration.value=c.intervalDuration;c.specialMonths.forEach((v,i)=>{document.getElementById("spv"+i).value=v.visits;document.getElementById("spd"+i).value=v.duration});(c.exceptionMonths||Array.from({length:12},()=>({visits:0,duration:8}))).forEach((v,i)=>{document.getElementById("exv"+i).value=v.visits||0;document.getElementById("exd"+i).value=v.duration||8});monthPosition.value=c.monthPosition;minGap.value=c.minGap;notes.value=c.notes||"";setCheckedDays(c.allowedDays);showTab("clients");scrollTo(0,0)}
+function editClient(i){let c=migrateClient(state.clients[i]);editIndex.value=i;clientName.value=c.name||"";clientType.value=c.type;address.value=c.address||"";email.value=c.email||"";phone.value=c.phone||"";lat.value=c.lat??"";lng.value=c.lng??"";defaultDuration.value=c.defaultDuration;priceMode.value=c.priceMode;price.value=c.price;placementMode.value=c.placementMode;forcedStart.value=c.forcedStart;forcedEnd.value=c.forcedEnd;linkedGroup.value=c.linkedGroup||"";neighborOrder.value=c.neighborOrder||"";frequencyMode.value=c.frequencyMode;toggleFrequencyMode();c.monthlyVisits.forEach((v,i)=>document.getElementById("mv"+i).value=v);intervalStartMonth.value=c.intervalStartMonth;intervalEndMonth.value=c.intervalEndMonth;intervalWeeks.value=c.intervalWeeks;intervalDuration.value=c.intervalDuration;c.specialMonths.forEach((v,i)=>{document.getElementById("spv"+i).value=v.visits;document.getElementById("spd"+i).value=v.duration});(c.exceptionMonths||Array.from({length:12},()=>({visits:0,duration:8}))).forEach((v,i)=>{document.getElementById("exv"+i).value=v.visits||0;document.getElementById("exd"+i).value=v.duration||8});monthPosition.value=c.monthPosition;minGap.value=c.minGap;notes.value=c.notes||"";setCheckedDays(c.allowedDays);showTab("clients");scrollTo(0,0)}
 async function deleteClient(i){if(confirm("Supprimer ce client ?")){await del("clients",state.clients[i].id);state.clients=await getAll("clients");renderClients();scheduleAutosave("suppression")}}
 function revenueFor(c,d){return c.priceMode==="hour"?c.price*d:c.price}
 function expandClientJobs(c){c=migrateClient(c);let jobs=[],y=state.settings?.year||2027;if(c.frequencyMode==="interval"){let d=new Date(y,c.intervalStartMonth,1),end=new Date(y,c.intervalEndMonth+1,0);while(d<=end){jobs.push({month:d.getMonth(),duration:c.intervalDuration});d.setDate(d.getDate()+7*c.intervalWeeks)}}else if(c.frequencyMode==="special"){c.specialMonths.forEach((m,mi)=>{for(let k=0;k<(m.visits||0);k++)jobs.push({month:mi,duration:m.duration||c.defaultDuration})})}else c.monthlyVisits.forEach((n,mi)=>{for(let k=0;k<n;k++)jobs.push({month:mi,duration:c.defaultDuration})});(c.exceptionMonths||[]).forEach((m,mi)=>{for(let k=0;k<(m.visits||0);k++)jobs.push({month:mi,duration:m.duration||8})});return jobs}
-function renderClients(){let h="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{c=migrateClient(c);let jobs=expandClientJobs(c),ca=jobs.reduce((s,j)=>s+revenueFor(c,j.duration),0);h+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.frequencyMode}</span><span class="badge">${jobs.length} pass/an</span><span class="badge">${ca.toFixed(0)} €</span>${c.linkedGroup?`<span class="badge">Lié : ${c.linkedGroup}</span>`:""}<br><span class="small">${c.address||""}</span><br><button onclick="editClient(${i})">Modifier</button><button class="danger" onclick="deleteClient(${i})">Supprimer</button></div>`});clientList.innerHTML=h||'<p class="small">Aucun client.</p>'}
+function renderClients(){let h="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{c=migrateClient(c);let jobs=expandClientJobs(c),ca=jobs.reduce((s,j)=>s+revenueFor(c,j.duration),0);h+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.frequencyMode}</span><span class="badge">${jobs.length} pass/an</span><span class="badge">${ca.toFixed(0)} €</span>${c.linkedGroup?`<span class="badge">Lié : ${c.linkedGroup}</span>`:""}${c.neighborOrder?`<span class="badge">${c.neighborOrder==="before"?"Avant":"Après"}</span>`:""}<br><span class="small">${c.address||""}</span><br><button onclick="editClient(${i})">Modifier</button><button class="danger" onclick="deleteClient(${i})">Supprimer</button></div>`});clientList.innerHTML=h||'<p class="small">Aucun client.</p>'}
 function parseVCF(t){let cards=t.split(/BEGIN:VCARD/i).slice(1),out=[];for(let raw of cards){let lines=raw.replace(/\r?\n[ \t]/g,"").split(/\r?\n/),c=emptyClient();for(let line of lines){line=line.trim();if(line.startsWith("FN:"))c.name=line.substring(3);else if(line.includes("EMAIL")&&line.includes(":"))c.email=line.split(":").slice(1).join(":");else if(line.includes("TEL")&&line.includes(":"))c.phone=line.split(":").slice(1).join(":");else if(line.includes("ADR")&&line.includes(":"))c.address=line.split(":").slice(1).join(":").replace(/;/g," ").replace(/\s+/g," ").trim()}if(c.name)out.push(c)}return out}
 async function importVCF(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=async ev=>{let arr=parseVCF(ev.target.result),n=0;for(let c of arr){if(!state.clients.some(x=>(x.name||"").toLowerCase()==c.name.toLowerCase())){await put("clients",c);n++}}state.clients=await getAll("clients");renderClients();scheduleAutosave("import");importStatus.innerHTML=`<div class="ok">${n} contact(s) importé(s).</div>`};r.readAsText(f)}
 function toISO(d){return d.toISOString().slice(0,10)}function parseDate(s){let [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
@@ -141,16 +175,16 @@ function mins(t){let [h,m]=t.split(":").map(Number);return h*60+m}function slotH
 function dist(a,b,c,d){if(!a||!b||!c||!d)return 9999;let R=6371,la=(c-a)*Math.PI/180,lo=(d-b)*Math.PI/180,x=Math.sin(la/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(lo/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 function geo(date,c){let same=state.planning.filter(p=>p.date===date&&p.lat&&p.lng);let score=!same.length?dist(state.settings.homeLat,state.settings.homeLng,c.lat,c.lng):Math.min(...same.map(p=>dist(p.lat,p.lng,c.lat,c.lng)));if(c.linkedGroup&&state.planning.some(p=>p.date===date&&p.linkedGroup&&p.linkedGroup.toLowerCase()===c.linkedGroup.toLowerCase()))score-=50;return score}
 function compatibleSlots(c,dow,dur){let slots=state.settings.slots[dow]||[];if(c.placementMode==="forcer")return [["Forcé",c.forcedStart,c.forcedEnd,true,"forced-"+c.forcedStart+"-"+c.forcedEnd]];return slots.map((s,i)=>[s[0],s[1],s[2],s[3],String(i)]).filter(s=>s[3]&&slotHours(s)>=dur&&(c.placementMode==="indifferent"||(c.placementMode==="matin"&&s[0]==="Matin")||(c.placementMode==="apresmidi"&&s[0]==="Après-midi")))}
-async function generatePlanning(){await saveSettingsNow(false);state.planning=[];let jobs=[];state.clients.forEach(c=>expandClientJobs(c).forEach((j,k)=>jobs.push({c:migrateClient(c),month:j.month,duration:j.duration,k})));jobs.sort((a,b)=>((a.c.allowedDays||[]).length+(a.c.placementMode==="indifferent"?2:0))-((b.c.allowedDays||[]).length+(b.c.placementMode==="indifferent"?2:0)));let blocked=blockedSet(),y=state.settings.year;for(let j of jobs){let c=j.c,dates=candDates(y,j.month,c.monthPosition);if(j.k>0)dates=dates.concat(candDates(y,j.month,"Indifférent"));let poss=[];for(let d of dates){let iso=toISO(d),dow=d.getDay();if(dow===0||blocked.has(iso)||!(c.allowedDays||[]).includes(dow)||!gapOK(c,iso))continue;compatibleSlots(c,dow,j.duration).forEach(s=>{let key=s[4];if(used(iso,key)+j.duration<=slotHours(s))poss.push({date:iso,slot:s,slotKey:key,score:geo(iso,c)})})}poss.sort((a,b)=>a.score-b.score||a.date.localeCompare(b.date));if(poss.length){let p=poss[0];state.planning.push({date:p.date,slot:`${p.slot[0]} ${p.slot[1]}-${p.slot[2]}`,slotKey:p.slotKey,client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||""})}else state.planning.push({date:"NON PLACÉ",slot:"",slotKey:"",client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||""})}state.planning.sort((a,b)=>a.date.localeCompare(b.date)||a.slot.localeCompare(b.slot));renderPlanning();renderTurnover();scheduleAutosave("planning")}
-function renderPlanning(){if(viewMode.value==="calendar"){planningTable.innerHTML="";renderCalendar();return}calendarView.innerHTML="";let placed=state.planning.filter(p=>p.date!=="NON PLACÉ"),total=placed.reduce((a,p)=>a+p.revenue,0),cesu=placed.filter(p=>p.type==="CESU").reduce((a,p)=>a+p.revenue,0),non=state.planning.length-placed.length;summary.innerHTML=`<div class="${non?'warn':'ok'}">CA placé : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Non placés : <b>${non}</b></div>`;let h="<table><tr><th>Date</th><th>Créneau</th><th>Client</th><th>Type</th><th>Durée</th><th>CA</th></tr>";state.planning.forEach(p=>h+=`<tr><td>${p.date}</td><td>${p.slot}</td><td>${p.client}</td><td>${p.type}</td><td>${p.duration} h</td><td>${p.revenue.toFixed(0)}€</td></tr>`);planningTable.innerHTML=h+"</table>"}
-function renderCalendar(){let mi=+calendarMonth.value,y=state.settings.year,last=new Date(y,mi+1,0).getDate(),first=new Date(y,mi,1).getDay(),off=first===0?6:first-1;let h=`<h3>${monthNames[mi]} ${y}</h3><div class="monthGrid">`;["L","M","M","J","V","S","D"].forEach(d=>h+=`<div class="dayCell"><b>${d}</b></div>`);for(let i=0;i<off;i++)h+=`<div class="dayCell"></div>`;for(let day=1;day<=last;day++){let iso=toISO(new Date(y,mi,day)),ev=state.planning.filter(p=>p.date===iso);h+=`<div class="dayCell"><div class="dayNum">${day}</div>`;ev.forEach(e=>h+=`<div class="event">${e.slot}<br>${e.client}</div>`);h+="</div>"}calendarView.innerHTML=h+"</div>";summary.innerHTML="";planningTable.innerHTML=""}
+async function generatePlanning(){await saveSettingsNow(false);let lockedVisits=state.planning.filter(p=>p.locked&&p.date&&p.date!=="NON PLACÉ");state.planning=[...lockedVisits];let jobs=[];state.clients.forEach(c=>expandClientJobs(c).forEach((j,k)=>jobs.push({c:migrateClient(c),month:j.month,duration:j.duration,k})));jobs.sort((a,b)=>((a.c.allowedDays||[]).length+(a.c.placementMode==="indifferent"?2:0))-((b.c.allowedDays||[]).length+(b.c.placementMode==="indifferent"?2:0)));let blocked=blockedSet(),y=state.settings.year;for(let j of jobs){let c=j.c,dates=candDates(y,j.month,c.monthPosition);if(j.k>0)dates=dates.concat(candDates(y,j.month,"Indifférent"));let poss=[];for(let d of dates){let iso=toISO(d),dow=d.getDay();if(dow===0||blocked.has(iso)||!(c.allowedDays||[]).includes(dow)||!gapOK(c,iso))continue;compatibleSlots(c,dow,j.duration).forEach(s=>{let key=s[4];if(used(iso,key)+j.duration<=slotHours(s))poss.push({date:iso,slot:s,slotKey:key,score:geo(iso,c)})})}poss.sort((a,b)=>a.score-b.score||a.date.localeCompare(b.date));if(poss.length){let p=poss[0];state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:p.date,slot:`${p.slot[0]} ${p.slot[1]}-${p.slot[2]}`,slotKey:p.slotKey,client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false})}else state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:"NON PLACÉ",slot:"",slotKey:"",client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false})}sortPlanningWithNeighbors();renderPlanning();renderTurnover();mapDate.innerHTML="";scheduleAutosave("planning")}
+function renderPlanning(){if(viewMode.value==="calendar"){planningTable.innerHTML="";renderCalendar();return}if(viewMode.value==="week"){planningTable.innerHTML="";renderWeek();return}calendarView.innerHTML="";let placed=state.planning.filter(p=>p.date!=="NON PLACÉ"),total=placed.reduce((a,p)=>a+p.revenue,0),cesu=placed.filter(p=>p.type==="CESU").reduce((a,p)=>a+p.revenue,0),non=state.planning.length-placed.length;summary.innerHTML=`<div class="${non?'warn':'ok'}">CA placé : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Non placés : <b>${non}</b></div>`;let h="<table><tr><th>Date</th><th>Créneau</th><th>Client</th><th>Type</th><th>Durée</th><th>CA</th><th>Statut</th></tr>";state.planning.forEach(p=>h+=`<tr><td>${p.date}</td><td>${p.slot}</td><td>${p.client}</td><td>${p.type}</td><td>${p.duration} h</td><td>${p.revenue.toFixed(0)}€</td><td>${p.locked?"🔒":""}${p.manual?" manuel":""}</td></tr>`);planningTable.innerHTML=h+"</table>";refreshVisitEditSelect();refreshClientPdfSelect()}
+function renderCalendar(){let mi=+calendarMonth.value,y=state.settings.year,last=new Date(y,mi+1,0).getDate(),first=new Date(y,mi,1).getDay(),off=first===0?6:first-1;let h=`<h3>${monthNames[mi]} ${y}</h3><div class="monthGrid">`;["L","M","M","J","V","S","D"].forEach(d=>h+=`<div class="dayCell"><b>${d}</b></div>`);for(let i=0;i<off;i++)h+=`<div class="dayCell"></div>`;for(let day=1;day<=last;day++){let iso=toISO(new Date(y,mi,day)),ev=state.planning.filter(p=>p.date===iso);h+=`<div class="dayCell"><div class="dayNum">${day}</div>`;ev.forEach(e=>h+=`<div class="event">${e.locked?"🔒 ":""}${e.slot}<br>${e.client}</div>`);h+="</div>"}calendarView.innerHTML=h+"</div>";summary.innerHTML="";planningTable.innerHTML=""}
 function renderTurnover(){let m=Array.from({length:12},()=>({cesu:0,ent:0,hours:0,total:0}));state.planning.filter(p=>p.date!=="NON PLACÉ").forEach(p=>{let i=+p.date.slice(5,7)-1;m[i].hours+=p.duration;m[i].total+=p.revenue;p.type==="CESU"?m[i].cesu+=p.revenue:m[i].ent+=p.revenue});let total=m.reduce((a,x)=>a+x.total,0),cesu=m.reduce((a,x)=>a+x.cesu,0),hours=m.reduce((a,x)=>a+x.hours,0);turnoverSummary.innerHTML=`<div class="ok">CA annuel : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Heures : <b>${hours.toFixed(0)} h</b></div>`;let h="<table><tr><th>Mois</th><th>CESU</th><th>Entreprise</th><th>Total</th><th>Heures</th></tr>";m.forEach((x,i)=>h+=`<tr><td>${monthNames[i]}</td><td>${x.cesu.toFixed(0)}€</td><td>${x.ent.toFixed(0)}€</td><td><b>${x.total.toFixed(0)}€</b></td><td>${x.hours.toFixed(0)}h</td></tr>`);turnoverTable.innerHTML=h+"</table>"}
 function printPlanning(){showTab("planning");setTimeout(()=>window.print(),300)}
 function backupObject(){return{app:"Un Coup de Pousse PWA",version:APP_VERSION,exportedAt:new Date().toISOString(),settings:state.settings,clients:state.clients,planning:state.planning}}
 let autosaveTimer=null;function scheduleAutosave(r){if(autosaveTimer)clearTimeout(autosaveTimer);autosaveHeader.innerText="Auto-sauvegarde en attente…";autosaveTimer=setTimeout(()=>autoSave(r),800)}
-async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v6",id);updateAutoSaveHeader();renderBackupStatus()}
+async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v8",id);updateAutoSaveHeader();renderBackupStatus()}
 async function cleanupAutosaves(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));for(let i=12;i<all.length;i++)await del("autosaves",all[i].id)}
-function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v6");autosaveHeader.innerText=l?`Version 6 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 6 — pas encore sauvegardé"}
+function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v8");autosaveHeader.innerText=l?`Version 8 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 8 — pas encore sauvegardé"}
 async function renderBackupStatus(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));backupStatus.innerHTML=`<div class="ok">Clients : <b>${state.clients.length}</b><br>Copies locales : <b>${all.length}</b></div>`;autosaveList.innerHTML=all.map(a=>`<div class="client"><b>${new Date(a.id).toLocaleString("fr-FR")}</b><br><span class="small">${a.reason||""}</span><br><button onclick="restoreAutosave('${a.id}')">Restaurer</button><button onclick="downloadAutosave('${a.id}')">Télécharger</button></div>`).join("")}
 function download(name,txt,type){let b=new Blob([txt],{type}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 function exportBackup(){download("sauvegarde_ucdp.json",JSON.stringify(backupObject(),null,2),"application/json")}
@@ -160,6 +194,182 @@ async function restoreAutosave(id){if(!confirm("Restaurer cette sauvegarde ?"))r
 async function importBackup(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=async ev=>{try{await applyBackup(JSON.parse(ev.target.result));alert("Sauvegarde importée")}catch(err){alert("Fichier invalide")}};r.readAsText(f)}
 async function applyBackup(b){await clearStore("settings");await clearStore("clients");state.settings=b.settings||defaultSettings();state.settings.id="main";await put("settings",state.settings);for(let c of (b.clients||[])){delete c.id;await put("clients",migrateClient(c))}state.planning=b.planning||[];state.clients=await getAll("clients");renderAll();renderPlanning();scheduleAutosave("restauration")}
 function esc(v){return `"${String(v??"").replaceAll('"','""')}"`}function exportPlanningCSV(){if(!state.planning.length)generatePlanning();let rows=[["Date","Créneau","Client","Type","Durée","CA","Adresse"]];state.planning.forEach(p=>rows.push([p.date,p.slot,p.client,p.type,p.duration,p.revenue,p.address]));download("planning_ucdp.csv","\ufeff"+rows.map(r=>r.map(esc).join(";")).join("\n"),"text/csv")}
+
+
+function sortPlanningWithNeighbors(){
+  state.planning.sort((a,b)=>{
+    let d=(a.date||"").localeCompare(b.date||"");
+    if(d!==0)return d;
+    if(a.linkedGroup&&b.linkedGroup&&a.linkedGroup===b.linkedGroup){
+      if(a.neighborOrder==="before"&&b.neighborOrder!=="before")return -1;
+      if(a.neighborOrder==="after"&&b.neighborOrder!=="after")return 1;
+      if(b.neighborOrder==="before"&&a.neighborOrder!=="before")return 1;
+      if(b.neighborOrder==="after"&&a.neighborOrder!=="after")return -1;
+    }
+    return (a.slot||"").localeCompare(b.slot||"");
+  });
+}
+function refreshVisitEditSelect(){
+  if(!document.getElementById("editVisitSelect"))return;
+  editVisitSelect.innerHTML=state.planning.map((p,i)=>`<option value="${i}">${p.date} — ${p.slot} — ${p.client}</option>`).join("");
+}
+function loadVisitEdit(){
+  let p=state.planning[+editVisitSelect.value];if(!p)return;
+  editVisitDate.value=p.date==="NON PLACÉ"?"":p.date;
+  editVisitSlot.value=p.slot||"";
+  editVisitLocked.value=p.locked?"true":"false";
+}
+function applyVisitEdit(){
+  let p=state.planning[+editVisitSelect.value];if(!p)return;
+  p.date=editVisitDate.value||"NON PLACÉ";
+  p.slot=editVisitSlot.value||p.slot;
+  p.locked=editVisitLocked.value==="true";
+  p.manual=true;
+  sortPlanningWithNeighbors();
+  renderPlanning();
+  renderTurnover();
+  scheduleAutosave("modification manuelle");
+}
+function refreshClientPdfSelect(){
+  if(!document.getElementById("clientPdfSelect"))return;
+  let names=[...new Set(state.planning.map(p=>p.client))].filter(Boolean).sort();
+  clientPdfSelect.innerHTML=names.map(n=>`<option value="${n}">${n}</option>`).join("");
+}
+function clientActionRun(){
+  let name=clientPdfSelect.value;
+  if(!name){alert("Aucun client sélectionné");return;}
+  let rows=state.planning.filter(p=>p.client===name&&p.date!=="NON PLACÉ").sort((a,b)=>a.date.localeCompare(b.date));
+  let client=state.clients.find(c=>c.name===name)||{};
+  if(clientAction.value==="mail"){
+    let body=`Bonjour,%0D%0A%0D%0AVoici les dates prévisionnelles d'intervention :%0D%0A%0D%0A`+
+      rows.map(p=>`${p.date} - ${p.slot}`).join("%0D%0A")+
+      `%0D%0A%0D%0ACordialement,%0D%0ARomain - Un Coup de Pousse`;
+    let subject=encodeURIComponent("Planning prévisionnel d'intervention");
+    location.href=`mailto:${client.email||""}?subject=${subject}&body=${body}`;
+    return;
+  }
+  let html=`<h2>Planning prévisionnel — ${name}</h2><p>Un Coup de Pousse</p><table><tr><th>Date</th><th>Créneau</th></tr>`+
+    rows.map(p=>`<tr><td>${p.date}</td><td>${p.slot}</td></tr>`).join("")+
+    `</table>`;
+  clientPdfPrint.innerHTML=html;
+  clientPdfPrint.classList.remove("hidden");
+  document.getElementById("planning").classList.add("printActive");
+  setTimeout(()=>{window.print();document.getElementById("planning").classList.remove("printActive");},300);
+}
+function addFrenchHolidays(){
+  let y=parseInt(year.value||state.settings.year||new Date().getFullYear());
+  function easter(Y){let a=Y%19,b=Math.floor(Y/100),c=Y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;return new Date(Y,month-1,day)}
+  function iso(d){return d.toISOString().slice(0,10)}
+  let e=easter(y);
+  let days=[`${y}-01-01`,`${y}-05-01`,`${y}-05-08`,`${y}-07-14`,`${y}-08-15`,`${y}-11-01`,`${y}-11-11`,`${y}-12-25`];
+  let easterMonday=new Date(e);easterMonday.setDate(e.getDate()+1);
+  let asc=new Date(e);asc.setDate(e.getDate()+39);
+  let pent=new Date(e);pent.setDate(e.getDate()+50);
+  days.push(iso(easterMonday),iso(asc),iso(pent));
+  let existing=(blockedDates.value||"").split("\n").map(x=>x.trim()).filter(Boolean);
+  let set=new Set([...existing,...days]);
+  blockedDates.value=[...set].sort().join("\n");
+  saveSettingsNow(false);
+  homeStatus.innerHTML='<div class="ok">Jours fériés français ajoutés.</div>';
+}
+function renderWeek(){
+  let dates=[...new Set(state.planning.filter(p=>p.date&&p.date!=="NON PLACÉ").map(p=>p.date))].sort();
+  if(!dates.length){calendarView.innerHTML='<div class="warn">Aucun planning généré.</div>';return;}
+  let first=dates[0];let d=parseDate(first);let day=d.getDay();let monday=new Date(d);monday.setDate(d.getDate()-((day+6)%7));
+  let html='<h3>Vue semaine</h3><table><tr><th>Jour</th><th>Rendez-vous</th></tr>';
+  for(let i=0;i<7;i++){let cur=new Date(monday);cur.setDate(monday.getDate()+i);let iso=toISO(cur);let ev=state.planning.filter(p=>p.date===iso);html+=`<tr><td>${iso}</td><td>${ev.map(e=>`${e.locked?"🔒 ":""}${e.slot} — ${e.client}`).join("<br>")}</td></tr>`}
+  calendarView.innerHTML=html+'</table>';summary.innerHTML="";planningTable.innerHTML="";
+}
+
+
+function haversineKm(a,b,c,d){return dist(a,b,c,d)}
+async function orsMatrix(points){
+  const key=state.settings.orsApiKey;
+  if(!key){throw new Error("Clé API OpenRouteService manquante");}
+  const locations=points.map(p=>[p.lng,p.lat]);
+  const res=await fetch("https://api.openrouteservice.org/v2/matrix/driving-car",{
+    method:"POST",
+    headers:{"Authorization":key,"Content-Type":"application/json"},
+    body:JSON.stringify({locations,metrics:["distance","duration"],units:"km"})
+  });
+  if(!res.ok){throw new Error("Erreur OpenRouteService "+res.status);}
+  return await res.json();
+}
+function greedyOrderByMatrix(matrix){
+  let n=matrix.distances.length;
+  let remaining=[];
+  for(let i=1;i<n;i++)remaining.push(i);
+  let order=[0],cur=0;
+  while(remaining.length){
+    let best=remaining[0],bestD=matrix.distances[cur][best]??999999;
+    for(let idx of remaining){
+      let d=matrix.distances[cur][idx]??999999;
+      if(d<bestD){best=idx;bestD=d}
+    }
+    order.push(best);
+    remaining=remaining.filter(x=>x!==best);
+    cur=best;
+  }
+  return order;
+}
+function routeUrlForPoints(points, app){
+  const coords=points.map(p=>`${p.lat},${p.lng}`);
+  if(app==="google"){
+    if(coords.length<=1)return "#";
+    const origin=coords[0], destination=coords[coords.length-1], waypoints=coords.slice(1,-1).join("|");
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints?`&waypoints=${encodeURIComponent(waypoints)}`:""}&travelmode=driving`;
+  }
+  return `https://maps.apple.com/?daddr=${coords.slice(1).join("+to:")}`;
+}
+async function optimizeSelectedDayRoute(){
+  let d=mapDate.value;
+  if(!d){renderMapLinks();d=mapDate.value;}
+  let visits=state.planning.filter(p=>p.date===d&&p.lat&&p.lng);
+  if(!visits.length){routeStats.innerHTML='<div class="warn">Aucun client avec coordonnées GPS pour cette date.</div>';return;}
+  let home={client:"Départ",lat:state.settings.homeLat,lng:state.settings.homeLng};
+  if(!home.lat||!home.lng){routeStats.innerHTML='<div class="warn">Renseigne les coordonnées GPS de départ.</div>';return;}
+  let points=[home,...visits];
+  try{
+    let matrix=await orsMatrix(points);
+    let order=greedyOrderByMatrix(matrix);
+    let orderedVisits=order.slice(1).map(i=>points[i]);
+    let original=state.planning.filter(p=>p.date===d);
+    let noGps=original.filter(p=>!p.lat||!p.lng);
+    let replacement=[...orderedVisits,...noGps];
+    let allOther=state.planning.filter(p=>p.date!==d);
+    state.planning=[...allOther,...replacement];
+    sortPlanningWithNeighbors();
+    renderPlanning();
+    renderMapLinks();
+    scheduleAutosave("optimisation tournée");
+    routeStats.innerHTML='<div class="ok">Journée optimisée avec OpenRouteService.</div>';
+  }catch(e){
+    routeStats.innerHTML=`<div class="warn">${e.message}. Optimisation approximative GPS utilisée.</div>`;
+    visits.sort((a,b)=>haversineKm(home.lat,home.lng,a.lat,a.lng)-haversineKm(home.lat,home.lng,b.lat,b.lng));
+    let allOther=state.planning.filter(p=>p.date!==d);
+    let noGps=state.planning.filter(p=>p.date===d&&(!p.lat||!p.lng));
+    state.planning=[...allOther,...visits,...noGps];
+    sortPlanningWithNeighbors();renderPlanning();renderMapLinks();scheduleAutosave("optimisation approximative");
+  }
+}
+async function calculateRouteStats(){
+  let d=mapDate.value;
+  if(!d){renderMapLinks();d=mapDate.value;}
+  let visits=state.planning.filter(p=>p.date===d&&p.lat&&p.lng);
+  if(!visits.length){routeStats.innerHTML='<div class="warn">Aucun client GPS ce jour-là.</div>';return;}
+  if(!state.settings.homeLat||!state.settings.homeLng){routeStats.innerHTML='<div class="warn">Coordonnées de départ manquantes.</div>';return;}
+  let points=[{client:"Départ",lat:state.settings.homeLat,lng:state.settings.homeLng},...visits,{client:"Retour",lat:state.settings.homeLat,lng:state.settings.homeLng}];
+  try{
+    let matrix=await orsMatrix(points);
+    let km=0,min=0;
+    for(let i=0;i<points.length-1;i++){km+=matrix.distances[i][i+1]||0;min+=(matrix.durations[i][i+1]||0)/60;}
+    routeStats.innerHTML=`<div class="ok">Distance route estimée : <b>${km.toFixed(1)} km</b><br>Temps de trajet estimé : <b>${min.toFixed(0)} min</b><br><a href="${routeUrlForPoints(points,mapApp.value)}" target="_blank"><button>Ouvrir l’itinéraire complet</button></a></div>`;
+  }catch(e){
+    let km=0;
+    for(let i=0;i<points.length-1;i++)km+=haversineKm(points[i].lat,points[i].lng,points[i+1].lat,points[i+1].lng);
+    routeStats.innerHTML=`<div class="warn">${e.message}. Distance à vol d’oiseau : <b>${km.toFixed(1)} km</b></div>`;
+  }
+}
 
 function renderMapLinks(){
   if(!state.planning.length){
@@ -173,7 +383,7 @@ function renderMapLinks(){
   let d=mapDate.value||dates[0];
   if(!d){mapLinks.innerHTML='<div class="warn">Aucune date placée.</div>';return;}
   let items=state.planning.filter(p=>p.date===d).sort((a,b)=>(a.slot||"").localeCompare(b.slot||""));
-  let html=`<h3>${d}</h3>`;
+  let pointsForRoute=[{client:"Départ",lat:state.settings.homeLat,lng:state.settings.homeLng},...items.filter(p=>p.lat&&p.lng),{client:"Retour",lat:state.settings.homeLat,lng:state.settings.homeLng}];let routeLink=pointsForRoute.length>2?routeUrlForPoints(pointsForRoute,mapApp.value):"#";let html=`<h3>${d}</h3><a href="${routeLink}" target="_blank"><button>Ouvrir itinéraire complet</button></a>`;
   items.forEach((p,i)=>{
     let q=p.lat&&p.lng?`${p.lat},${p.lng}`:encodeURIComponent(p.address||p.client);
     let url=mapApp.value==="google"?`https://www.google.com/maps/search/?api=1&query=${q}`:`https://maps.apple.com/?q=${q}`;
@@ -182,7 +392,7 @@ function renderMapLinks(){
   mapLinks.innerHTML=html;
 }
 
-if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=6").then(r=>r.update()).catch(()=>{})}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=8").then(r=>r.update()).catch(()=>{})}
 openDB().then(loadAll);
 </script>
 </body>
