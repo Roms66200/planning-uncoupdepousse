@@ -1,7 +1,8 @@
-# UCDP Planning V9
+# UCDP Planning V10
 
-Correctifs :
-- Correction modification/enregistrement des clients importés depuis contacts iPhone.
-- Édition basée sur l'ID client.
-- Horaire forcé masqué par défaut avec case à cocher.
-- Passages exceptionnels masqués par défaut avec case à cocher.
+Correctif important :
+- Le bouton Enregistrer client ne plante plus silencieusement.
+- Correction du champ clientType/type.
+- Ajout d'un message visible après enregistrement.
+- Groupe voisin et ordre voisin masqués par défaut derrière une case à cocher.
+- Horaire forcé et passages exceptionnels restent optionnels.
