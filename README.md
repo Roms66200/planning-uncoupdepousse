@@ -1,8 +1,7 @@
-# UCDP Planning V10
+# UCDP Planning V12
 
-Correctif important :
-- Le bouton Enregistrer client ne plante plus silencieusement.
-- Correction du champ clientType/type.
-- Ajout d'un message visible après enregistrement.
-- Groupe voisin et ordre voisin masqués par défaut derrière une case à cocher.
-- Horaire forcé et passages exceptionnels restent optionnels.
+Ajout :
+- Anti NON PLACÉ.
+- Décalage automatique ± 3 / 7 / 14 jours ou tout le mois.
+- Placement forcé hors consigne si nécessaire.
+- Les rendez-vous forcés sont marqués “hors consigne”.
