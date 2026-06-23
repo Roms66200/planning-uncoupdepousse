@@ -35,14 +35,14 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <body>
 <header>
 <h1>Un Coup de Pousse — Planning</h1>
-<div class="status" id="autosaveHeader">Version 13</div>
+<div class="status" id="autosaveHeader">Version 15</div>
 <div class="tabs">
 <button onclick="showTab('home')">Accueil</button><button onclick="showTab('clients')">Clients</button><button onclick="showTab('planning')">Planning</button><button onclick="showTab('turnover')">CA</button><button onclick="showTab('map')">Carte</button><button onclick="showTab('backup')">Sauvegarde</button>
 </div>
 </header>
 <main>
 <section id="home" class="card">
-<h2>Accueil / Réglages</h2><div class="ok"><b>Version 13 installée</b> — fréquences spéciales, fréquences hebdomadaires corrigées, créneaux découpés et anti-doublons client/jour.</div>
+<h2>Accueil / Réglages</h2><div class="ok"><b>Version 15 installée</b> — fréquences spéciales, enchaînement des passages d’un même client, jours stricts et tri matin/après-midi.</div>
 <div class="row"><div><label>Année</label><input id="year" type="number" value="2027"></div><div><label>Adresse départ</label><input id="homeAddress" placeholder="Montescot, France"></div></div>
 <div class="row"><div><label>Latitude départ</label><input id="homeLat" type="number" step="0.000001"></div><div><label>Longitude départ</label><input id="homeLng" type="number" step="0.000001"></div></div>
 <label>Clé API OpenRouteService</label><input id="orsApiKey" placeholder="Colle ta clé OpenRouteService ici">
@@ -55,7 +55,7 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <p class="small">Pour éviter les rendez-vous non placés, l’application peut décaler autour de la période prévue.</p>
 <div class="row">
 <div><label>Décalage autorisé</label><select id="planningFlexDays"><option value="0">Aucun</option><option value="3">± 3 jours</option><option value="7" selected>± 7 jours</option><option value="14">± 14 jours</option><option value="30">Tout le mois</option></select></div>
-<div><label>Forcer placement</label><select id="forcePlacement"><option value="true" selected>Oui, éviter NON PLACÉ</option><option value="false">Non, strict</option></select></div>
+<div><label>Forcer placement</label><select id="forcePlacement"><option value="true" selected>Oui, mais en dernier recours</option><option value="false">Non, strict</option></select></div>
 </div>
 </div>
 
@@ -107,6 +107,17 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <div class="row">
 <div><label>Début forcé</label><input id="secondForcedStart" type="time" value="16:00"></div>
 <div><label>Fin forcée</label><input id="secondForcedEnd" type="time" value="18:00"></div>
+</div>
+</div>
+
+
+<label><input id="useConsecutiveVisits" type="checkbox" onchange="toggleConsecutiveVisits()"> Enchaîner les passages du même client</label>
+<div id="consecutiveBox" class="slot hidden">
+<b>Passages à la suite</b>
+<p class="small">Utile si tu fais une journée de 8h + une demi-journée de 4h dans le même mois, ou plusieurs passages d’affilée.</p>
+<div class="row">
+<div><label>Mode</label><select id="consecutiveMode"><option value="nextday" selected>Jours consécutifs si possible</option><option value="sameweek">Même semaine si possible</option></select></div>
+<div><label>Écart maximum</label><select id="consecutiveGap"><option value="1" selected>1 jour</option><option value="2">2 jours</option><option value="3">3 jours</option><option value="7">Même semaine</option></select></div>
 </div>
 </div>
 
@@ -167,15 +178,15 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 </main>
 
 <script>
-const APP_VERSION="13.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
+const APP_VERSION="15.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
 let db=null,state={settings:null,clients:[],planning:[]};
 const monthNames=["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"],dayNames={1:"Lundi",2:"Mardi",3:"Mercredi",4:"Jeudi",5:"Vendredi",6:"Samedi"};
 function showTab(id){["home","clients","planning","turnover","map","backup"].forEach(x=>document.getElementById(x).classList.add("hidden"));document.getElementById(id).classList.remove("hidden");if(id==="backup")renderBackupStatus();if(id==="turnover")renderTurnover();if(id==="planning")renderPlanning();if(id==="map")renderMapLinks()}
 function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=e=>{let d=e.target.result;if(!d.objectStoreNames.contains("settings"))d.createObjectStore("settings",{keyPath:"id"});if(!d.objectStoreNames.contains("clients"))d.createObjectStore("clients",{keyPath:"id",autoIncrement:true});if(!d.objectStoreNames.contains("autosaves"))d.createObjectStore("autosaves",{keyPath:"id"})};r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=e=>rej(e)})}
 function tx(s,m="readonly"){return db.transaction(s,m).objectStore(s)}function getAll(s){return new Promise(res=>{let r=tx(s).getAll();r.onsuccess=()=>res(r.result||[])})}function put(s,o){return new Promise(res=>{let r=tx(s,"readwrite").put(o);r.onsuccess=()=>res(r.result)})}function del(s,k){return new Promise(res=>{let r=tx(s,"readwrite").delete(k);r.onsuccess=()=>res()})}function clearStore(s){return new Promise(res=>{let r=tx(s,"readwrite").clear();r.onsuccess=()=>res()})}
 function defaultSlots(){return{1:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],2:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],3:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]],4:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],5:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],6:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]]}}
-function defaultSettings(){return{id:"main",year:2027,homeAddress:"",homeLat:null,homeLng:null,blockedDates:"",orsApiKey:"",planningFlexDays:7,forcePlacement:"true",slots:defaultSlots()}}
-function emptyClient(){return{name:"",type:"CESU",address:"",email:"",phone:"",lat:null,lng:null,defaultDuration:4,priceMode:"visit",price:300,placementMode:"matin",forcedStart:"12:00",forcedEnd:"14:00",linkedGroup:"",neighborOrder:"",useSecondFrequency:false,secondStartMonth:3,secondEndMonth:9,secondWeeks:1,secondWeekday:3,secondDuration:2,secondPlacement:"forcer",secondForcedStart:"16:00",secondForcedEnd:"18:00",frequencyMode:"monthly",monthlyVisits:Array(12).fill(0),monthlyDurations:Array(12).fill(4),intervalStartMonth:2,intervalEndMonth:9,intervalWeeks:3,intervalDuration:4,specialMonths:Array.from({length:12},()=>({visits:0,duration:4})),exceptionMonths:Array.from({length:12},()=>({visits:0,duration:8})),monthPosition:"Indifférent",minGap:7,allowedDays:[1,2,3,4,5,6],notes:""}}
+function defaultSettings(){return{id:"main",year:2027,homeAddress:"",homeLat:null,homeLng:null,blockedDates:"",orsApiKey:"",planningFlexDays:7,forcePlacement:"true",strictDays:"true",slots:defaultSlots()}}
+function emptyClient(){return{name:"",type:"CESU",address:"",email:"",phone:"",lat:null,lng:null,defaultDuration:4,priceMode:"visit",price:300,placementMode:"matin",forcedStart:"12:00",forcedEnd:"14:00",linkedGroup:"",neighborOrder:"",useSecondFrequency:false,useConsecutiveVisits:false,consecutiveMode:"nextday",consecutiveGap:1,secondStartMonth:3,secondEndMonth:9,secondWeeks:1,secondWeekday:3,secondDuration:2,secondPlacement:"forcer",secondForcedStart:"16:00",secondForcedEnd:"18:00",frequencyMode:"monthly",monthlyVisits:Array(12).fill(0),monthlyDurations:Array(12).fill(4),intervalStartMonth:2,intervalEndMonth:9,intervalWeeks:3,intervalDuration:4,specialMonths:Array.from({length:12},()=>({visits:0,duration:4})),exceptionMonths:Array.from({length:12},()=>({visits:0,duration:8})),monthPosition:"Indifférent",minGap:7,allowedDays:[1,2,3,4,5,6],notes:""}}
 function migrateClient(c){let n={...emptyClient(),...c};if(c.months&&!c.monthlyVisits)n.monthlyVisits=c.months;if(c.duration&&!c.defaultDuration)n.defaultDuration=c.duration;if(n.type!=="Entreprise")n.type="CESU";if(!n.specialMonths)n.specialMonths=Array.from({length:12},(_,i)=>({visits:n.monthlyVisits?.[i]||0,duration:n.defaultDuration||4}));if(!n.exceptionMonths)n.exceptionMonths=Array.from({length:12},()=>({visits:0,duration:8}));return n}
 async function loadAll(){let s=await getAll("settings");state.settings=s[0]||defaultSettings();if(!s[0])await put("settings",state.settings);state.clients=(await getAll("clients")).map(migrateClient);renderAll();scheduleAutosave("chargement")}
 function renderAll(){buildSlots();buildMonths();buildCalendarMonth();renderSettings();renderClients();renderBackupStatus();updateAutoSaveHeader()}
@@ -184,13 +195,14 @@ function buildMonths(){monthlyVisits.innerHTML="";specialMonths.innerHTML="";exc
 function buildCalendarMonth(){calendarMonth.innerHTML=intervalStartMonth.innerHTML=intervalEndMonth.innerHTML=secondStartMonth.innerHTML=secondEndMonth.innerHTML="";monthNames.forEach((m,i)=>{calendarMonth.innerHTML+=`<option value="${i}">${m}</option>`;intervalStartMonth.innerHTML+=`<option value="${i}">${m}</option>`;intervalEndMonth.innerHTML+=`<option value="${i}">${m}</option>`;secondStartMonth.innerHTML+=`<option value="${i}">${m}</option>`;secondEndMonth.innerHTML+=`<option value="${i}">${m}</option>`})}
 function renderSettings(){let s=state.settings;year.value=s.year;homeAddress.value=s.homeAddress||"";homeLat.value=s.homeLat??"";homeLng.value=s.homeLng??"";blockedDates.value=s.blockedDates||"";orsApiKey.value=s.orsApiKey||"";planningFlexDays.value=s.planningFlexDays??7;forcePlacement.value=s.forcePlacement??"true"}
 function getSlotsFromUI(){let out={};for(let d=1;d<=6;d++){out[d]=[];for(let i=0;i<2;i++){let n=i===0?"Matin":"Après-midi";out[d].push([n,document.getElementById(`slot_${d}_${i}_start`).value,document.getElementById(`slot_${d}_${i}_end`).value,document.getElementById(`slot_${d}_${i}_active`).checked])}}return out}
-async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,orsApiKey:orsApiKey.value.trim(),planningFlexDays:+planningFlexDays.value,forcePlacement:forcePlacement.value,slots:getSlotsFromUI()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés.</div>'}
+async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,orsApiKey:orsApiKey.value.trim(),planningFlexDays:+planningFlexDays.value,forcePlacement:forcePlacement.value,strictDays:"true",slots:getSlotsFromUI()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés.</div>'}
 async function applyDefaultSlots(){state.settings.slots=defaultSlots();await put("settings",state.settings);buildSlots();scheduleAutosave("planning type");homeStatus.innerHTML='<div class="ok">Planning type appliqué.</div>'}
 function toggleFrequencyMode(){monthlyBox.classList.toggle("hidden",frequencyMode.value!=="monthly");intervalBox.classList.toggle("hidden",frequencyMode.value!=="interval");specialBox.classList.toggle("hidden",frequencyMode.value!=="special")}
 function toggleForcedTime(){forcedTimeBox.classList.toggle("hidden",!useForcedTime.checked);if(useForcedTime.checked)placementMode.value="forcer";else if(placementMode.value==="forcer")placementMode.value="matin"}
 function toggleExceptions(){exceptionBox.classList.toggle("hidden",!useExceptions.checked)}
 function toggleNeighborGroup(){neighborBox.classList.toggle("hidden",!useNeighborGroup.checked);if(!useNeighborGroup.checked){linkedGroup.value="";neighborOrder.value=""}}
 function toggleSecondFrequency(){secondFrequencyBox.classList.toggle("hidden",!useSecondFrequency.checked)}
+function toggleConsecutiveVisits(){consecutiveBox.classList.toggle("hidden",!useConsecutiveVisits.checked)}
 async function geocodeAddress(a){if(!a||a.trim().length<5){alert("Adresse trop courte");return null}try{let r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=fr&q="+encodeURIComponent(a));let d=await r.json();if(!d.length){alert("Adresse non trouvée");return null}return{lat:+d[0].lat,lng:+d[0].lon}}catch(e){alert("Connexion nécessaire");return null}}
 async function geocodeHome(){let r=await geocodeAddress(homeAddress.value);if(r){homeLat.value=r.lat.toFixed(6);homeLng.value=r.lng.toFixed(6);await saveSettingsNow(false);homeStatus.innerHTML='<div class="ok">GPS départ trouvé.</div>'}}
 async function geocodeClient(){let r=await geocodeAddress(address.value);if(r){lat.value=r.lat.toFixed(6);lng.value=r.lng.toFixed(6)}}
@@ -218,7 +230,7 @@ async function saveClient(){
     c.forcedEnd=forcedEnd.value;
     c.linkedGroup=useNeighborGroup.checked ? linkedGroup.value.trim() : "";
     c.neighborOrder=useNeighborGroup.checked ? neighborOrder.value : "";
-    c.useSecondFrequency=useSecondFrequency.checked;c.secondStartMonth=+secondStartMonth.value;c.secondEndMonth=+secondEndMonth.value;c.secondWeeks=+secondWeeks.value;c.secondWeekday=+secondWeekday.value;c.secondDuration=+secondDuration.value;c.secondPlacement=secondPlacement.value;c.secondForcedStart=secondForcedStart.value;c.secondForcedEnd=secondForcedEnd.value;c.frequencyMode=frequencyMode.value;
+    c.useConsecutiveVisits=useConsecutiveVisits.checked;c.consecutiveMode=consecutiveMode.value;c.consecutiveGap=+consecutiveGap.value;c.useSecondFrequency=useSecondFrequency.checked;c.secondStartMonth=+secondStartMonth.value;c.secondEndMonth=+secondEndMonth.value;c.secondWeeks=+secondWeeks.value;c.secondWeekday=+secondWeekday.value;c.secondDuration=+secondDuration.value;c.secondPlacement=secondPlacement.value;c.secondForcedStart=secondForcedStart.value;c.secondForcedEnd=secondForcedEnd.value;c.frequencyMode=frequencyMode.value;
     c.monthPosition=monthPosition.value;
     c.notes=notes.value;
 
@@ -256,8 +268,8 @@ async function saveClient(){
     alert("Erreur enregistrement : "+err.message);
   }
 }
-function resetClientForm(){editIndex.value="-1";["clientName","address","email","phone","lat","lng","notes","linkedGroup"].forEach(id=>document.getElementById(id).value="");useNeighborGroup.checked=false;toggleNeighborGroup();clientType.value="CESU";defaultDuration.value=4;priceMode.value="visit";price.value=300;placementMode.value="matin";useForcedTime.checked=false;toggleForcedTime();forcedStart.value="12:00";forcedEnd.value="14:00";useSecondFrequency.checked=false;toggleSecondFrequency();secondStartMonth.value=3;secondEndMonth.value=9;secondWeeks.value=1;secondWeekday.value=3;secondDuration.value=2;secondPlacement.value="forcer";secondForcedStart.value="16:00";secondForcedEnd.value="18:00";frequencyMode.value="monthly";toggleFrequencyMode();intervalStartMonth.value=2;intervalEndMonth.value=9;intervalWeeks.value=3;intervalDuration.value=4;monthPosition.value="Indifférent";minGap.value=7;useExceptions.checked=false;toggleExceptions();monthNames.forEach((_,i)=>{document.getElementById("mv"+i).value=0;document.getElementById("spv"+i).value=0;document.getElementById("spd"+i).value=4;document.getElementById("exv"+i).value=0;document.getElementById("exd"+i).value=8});setCheckedDays([1,2,3,4,5,6])}
-function editClient(id){let raw=state.clients.find(x=>String(x.id)===String(id));if(!raw){alert("Client introuvable");return}let c=migrateClient(raw);editIndex.value=String(c.id);clientName.value=c.name||"";clientType.value=c.type;address.value=c.address||"";email.value=c.email||"";phone.value=c.phone||"";lat.value=c.lat??"";lng.value=c.lng??"";defaultDuration.value=c.defaultDuration;priceMode.value=c.priceMode;price.value=c.price;placementMode.value=c.placementMode==="forcer"?"forcer":c.placementMode;useForcedTime.checked=c.placementMode==="forcer";toggleForcedTime();forcedStart.value=c.forcedStart;forcedEnd.value=c.forcedEnd;useNeighborGroup.checked=!!c.linkedGroup;toggleNeighborGroup();linkedGroup.value=c.linkedGroup||"";neighborOrder.value=c.neighborOrder||"";useSecondFrequency.checked=!!c.useSecondFrequency;toggleSecondFrequency();secondStartMonth.value=c.secondStartMonth??3;secondEndMonth.value=c.secondEndMonth??9;secondWeeks.value=c.secondWeeks??1;secondWeekday.value=c.secondWeekday??3;secondDuration.value=c.secondDuration??2;secondPlacement.value=c.secondPlacement||"forcer";secondForcedStart.value=c.secondForcedStart||"16:00";secondForcedEnd.value=c.secondForcedEnd||"18:00";frequencyMode.value=c.frequencyMode;toggleFrequencyMode();c.monthlyVisits.forEach((v,i)=>document.getElementById("mv"+i).value=v);intervalStartMonth.value=c.intervalStartMonth;intervalEndMonth.value=c.intervalEndMonth;intervalWeeks.value=c.intervalWeeks;intervalDuration.value=c.intervalDuration;c.specialMonths.forEach((v,i)=>{document.getElementById("spv"+i).value=v.visits;document.getElementById("spd"+i).value=v.duration});let hasEx=(c.exceptionMonths||[]).some(x=>(x.visits||0)>0);useExceptions.checked=hasEx;toggleExceptions();(c.exceptionMonths||Array.from({length:12},()=>({visits:0,duration:8}))).forEach((v,i)=>{document.getElementById("exv"+i).value=v.visits||0;document.getElementById("exd"+i).value=v.duration||8});monthPosition.value=c.monthPosition;minGap.value=c.minGap;notes.value=c.notes||"";setCheckedDays(c.allowedDays);showTab("clients");scrollTo(0,0)}
+function resetClientForm(){editIndex.value="-1";["clientName","address","email","phone","lat","lng","notes","linkedGroup"].forEach(id=>document.getElementById(id).value="");useNeighborGroup.checked=false;toggleNeighborGroup();clientType.value="CESU";defaultDuration.value=4;priceMode.value="visit";price.value=300;placementMode.value="matin";useForcedTime.checked=false;toggleForcedTime();forcedStart.value="12:00";forcedEnd.value="14:00";useConsecutiveVisits.checked=false;toggleConsecutiveVisits();consecutiveMode.value="nextday";consecutiveGap.value=1;useSecondFrequency.checked=false;toggleSecondFrequency();secondStartMonth.value=3;secondEndMonth.value=9;secondWeeks.value=1;secondWeekday.value=3;secondDuration.value=2;secondPlacement.value="forcer";secondForcedStart.value="16:00";secondForcedEnd.value="18:00";frequencyMode.value="monthly";toggleFrequencyMode();intervalStartMonth.value=2;intervalEndMonth.value=9;intervalWeeks.value=3;intervalDuration.value=4;monthPosition.value="Indifférent";minGap.value=7;useExceptions.checked=false;toggleExceptions();monthNames.forEach((_,i)=>{document.getElementById("mv"+i).value=0;document.getElementById("spv"+i).value=0;document.getElementById("spd"+i).value=4;document.getElementById("exv"+i).value=0;document.getElementById("exd"+i).value=8});setCheckedDays([1,2,3,4,5,6])}
+function editClient(id){let raw=state.clients.find(x=>String(x.id)===String(id));if(!raw){alert("Client introuvable");return}let c=migrateClient(raw);editIndex.value=String(c.id);clientName.value=c.name||"";clientType.value=c.type;address.value=c.address||"";email.value=c.email||"";phone.value=c.phone||"";lat.value=c.lat??"";lng.value=c.lng??"";defaultDuration.value=c.defaultDuration;priceMode.value=c.priceMode;price.value=c.price;placementMode.value=c.placementMode==="forcer"?"forcer":c.placementMode;useForcedTime.checked=c.placementMode==="forcer";toggleForcedTime();forcedStart.value=c.forcedStart;forcedEnd.value=c.forcedEnd;useNeighborGroup.checked=!!c.linkedGroup;toggleNeighborGroup();linkedGroup.value=c.linkedGroup||"";neighborOrder.value=c.neighborOrder||"";useConsecutiveVisits.checked=!!c.useConsecutiveVisits;toggleConsecutiveVisits();consecutiveMode.value=c.consecutiveMode||"nextday";consecutiveGap.value=c.consecutiveGap||1;useSecondFrequency.checked=!!c.useSecondFrequency;toggleSecondFrequency();secondStartMonth.value=c.secondStartMonth??3;secondEndMonth.value=c.secondEndMonth??9;secondWeeks.value=c.secondWeeks??1;secondWeekday.value=c.secondWeekday??3;secondDuration.value=c.secondDuration??2;secondPlacement.value=c.secondPlacement||"forcer";secondForcedStart.value=c.secondForcedStart||"16:00";secondForcedEnd.value=c.secondForcedEnd||"18:00";frequencyMode.value=c.frequencyMode;toggleFrequencyMode();c.monthlyVisits.forEach((v,i)=>document.getElementById("mv"+i).value=v);intervalStartMonth.value=c.intervalStartMonth;intervalEndMonth.value=c.intervalEndMonth;intervalWeeks.value=c.intervalWeeks;intervalDuration.value=c.intervalDuration;c.specialMonths.forEach((v,i)=>{document.getElementById("spv"+i).value=v.visits;document.getElementById("spd"+i).value=v.duration});let hasEx=(c.exceptionMonths||[]).some(x=>(x.visits||0)>0);useExceptions.checked=hasEx;toggleExceptions();(c.exceptionMonths||Array.from({length:12},()=>({visits:0,duration:8}))).forEach((v,i)=>{document.getElementById("exv"+i).value=v.visits||0;document.getElementById("exd"+i).value=v.duration||8});monthPosition.value=c.monthPosition;minGap.value=c.minGap;notes.value=c.notes||"";setCheckedDays(c.allowedDays);showTab("clients");scrollTo(0,0)}
 async function deleteClient(id){if(confirm("Supprimer ce client ?")){await del("clients",id);state.clients=await getAll("clients");renderClients();scheduleAutosave("suppression")}}
 function revenueFor(c,d){return c.priceMode==="hour"?c.price*d:c.price}
 function expandClientJobs(c){
@@ -280,7 +292,7 @@ if(c.useSecondFrequency){
   while(d<=end){jobs.push({month:d.getMonth(),duration:c.secondDuration,weekday:c.secondWeekday,placement:c.secondPlacement,forcedStart:c.secondForcedStart,forcedEnd:c.secondForcedEnd,secondary:true,targetDate:toISO(d)});d.setDate(d.getDate()+7*c.secondWeeks)}
 }
 return jobs}
-function renderClients(){let h="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{c=migrateClient(c);let jobs=expandClientJobs(c),ca=jobs.reduce((s,j)=>s+revenueFor(c,j.duration),0);h+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.frequencyMode}</span><span class="badge">${jobs.length} pass/an</span><span class="badge">${ca.toFixed(0)} €</span>${c.linkedGroup?`<span class="badge">Lié : ${c.linkedGroup}</span>`:""}${c.useSecondFrequency?`<span class="badge">2e fréquence</span>`:""}${c.neighborOrder?`<span class="badge">${c.neighborOrder==="before"?"Avant":"Après"}</span>`:""}<br><span class="small">${c.address||""}</span><br><button onclick="editClient(${c.id})">Modifier</button><button class="danger" onclick="deleteClient(${c.id})">Supprimer</button></div>`});clientList.innerHTML=h||'<p class="small">Aucun client.</p>'}
+function renderClients(){let h="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{c=migrateClient(c);let jobs=expandClientJobs(c),ca=jobs.reduce((s,j)=>s+revenueFor(c,j.duration),0);h+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.frequencyMode}</span><span class="badge">${jobs.length} pass/an</span><span class="badge">${ca.toFixed(0)} €</span>${c.linkedGroup?`<span class="badge">Lié : ${c.linkedGroup}</span>`:""}${c.useSecondFrequency?`<span class="badge">2e fréquence</span>`:""}${c.useConsecutiveVisits?`<span class="badge">À la suite</span>`:""}${c.neighborOrder?`<span class="badge">${c.neighborOrder==="before"?"Avant":"Après"}</span>`:""}<br><span class="small">${c.address||""}</span><br><button onclick="editClient(${c.id})">Modifier</button><button class="danger" onclick="deleteClient(${c.id})">Supprimer</button></div>`});clientList.innerHTML=h||'<p class="small">Aucun client.</p>'}
 function parseVCF(t){let cards=t.split(/BEGIN:VCARD/i).slice(1),out=[];for(let raw of cards){let lines=raw.replace(/\r?\n[ \t]/g,"").split(/\r?\n/),c=emptyClient();for(let line of lines){line=line.trim();if(line.startsWith("FN:"))c.name=line.substring(3);else if(line.includes("EMAIL")&&line.includes(":"))c.email=line.split(":").slice(1).join(":");else if(line.includes("TEL")&&line.includes(":"))c.phone=line.split(":").slice(1).join(":");else if(line.includes("ADR")&&line.includes(":"))c.address=line.split(":").slice(1).join(":").replace(/;/g," ").replace(/\s+/g," ").trim()}if(c.name)out.push(c)}return out}
 async function importVCF(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=async ev=>{let arr=parseVCF(ev.target.result),n=0;for(let c of arr){if(!state.clients.some(x=>(x.name||"").toLowerCase()==c.name.toLowerCase())){await put("clients",c);n++}}state.clients=await getAll("clients");renderClients();scheduleAutosave("import");importStatus.innerHTML=`<div class="ok">${n} contact(s) importé(s).</div>`};r.readAsText(f)}
 function toISO(d){return d.toISOString().slice(0,10)}function parseDate(s){let [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
@@ -303,60 +315,187 @@ for(let d of base){
 let seen=new Set();
 return [...base,...extra].filter(d=>{let k=toISO(d);if(seen.has(k))return false;seen.add(k);return true});
 }
-function targetDatesAround(target,mi){let flex=state.settings?.planningFlexDays??7;let base=parseDate(target);let arr=[];for(let off=-flex;off<=flex;off++){let d=new Date(base);d.setDate(base.getDate()+off);if(d.getMonth()===mi)arr.push(d)}return arr.length?arr:[base]}
-function gapOK(c,date){let d=parseDate(date);return state.planning.filter(p=>p.client===c.name&&p.date!=="NON PLACÉ").map(p=>parseDate(p.date)).every(x=>Math.abs((d-x)/86400000)>=c.minGap)}
-function mins(t){let [h,m]=t.split(":").map(Number);return h*60+m}
-function hhmm(total){total=Math.round(total);let h=Math.floor(total/60),m=total%60;return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")}
-function slotHours(s){return Math.max(0,(mins(s[2])-mins(s[1]))/60)}
-function used(date,key){return state.planning.filter(p=>p.date===date&&p.slotKey===key).reduce((a,p)=>a+p.duration,0)}
-function usedMinutes(date,key){return used(date,key)*60}
-function clientAlreadyThisDay(client,date){return state.planning.some(p=>p.client===client&&p.date===date)}
-function makeActualSlot(s,date,key,duration){let start=mins(s[1])+usedMinutes(date,key);let end=start+duration*60;if(end>mins(s[2])){start=mins(s[1]);end=mins(s[2])}return `${s[0]} ${hhmm(start)}-${hhmm(end)}`}
-
-function dist(a,b,c,d){if(!a||!b||!c||!d)return 9999;let R=6371,la=(c-a)*Math.PI/180,lo=(d-b)*Math.PI/180,x=Math.sin(la/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(lo/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
-function geo(date,c){let same=state.planning.filter(p=>p.date===date&&p.lat&&p.lng);let score=!same.length?dist(state.settings.homeLat,state.settings.homeLng,c.lat,c.lng):Math.min(...same.map(p=>dist(p.lat,p.lng,c.lat,c.lng)));if(c.linkedGroup&&state.planning.some(p=>p.date===date&&p.linkedGroup&&p.linkedGroup.toLowerCase()===c.linkedGroup.toLowerCase()))score-=50;return score}
-function compatibleSlots(c,dow,dur,job=null){
-let placement=job?.placement||c.placementMode;
-let fStart=job?.forcedStart||c.forcedStart;
-let fEnd=job?.forcedEnd||c.forcedEnd;
-let slots=state.settings.slots[dow]||[];
-if(placement==="forcer")return [["Forcé",fStart,fEnd,true,"forced-"+fStart+"-"+fEnd]];
-return slots.map((s,i)=>[s[0],s[1],s[2],s[3],String(i)]).filter(s=>s[3]&&slotHours(s)>=dur&&(placement==="indifferent"||(placement==="matin"&&s[0]==="Matin")||(placement==="apresmidi"&&s[0]==="Après-midi")))}
-
-function fallbackSlots(c,dow,dur,job=null){
-let slots=state.settings.slots[dow]||[];
-let normal=slots.map((s,i)=>[s[0],s[1],s[2],s[3],String(i)]).filter(s=>s[3]&&slotHours(s)>=dur);
-if(normal.length)return normal;
-if(job?.placement==="forcer")return [["Forcé",job.forcedStart,job.forcedEnd,true,"forced-"+job.forcedStart+"-"+job.forcedEnd]];
-if(c.placementMode==="forcer")return [["Forcé",c.forcedStart,c.forcedEnd,true,"forced-"+c.forcedStart+"-"+c.forcedEnd]];
-return [["Hors consigne","08:00",String(8+dur).padStart(2,"0")+":00",true,"forced-fallback-"+dur]];
+function targetDatesAround(target,mi,weekday=null){
+  let flex=state.settings?.planningFlexDays??7;
+  let base=parseDate(target);
+  let arr=[];
+  for(let off=-flex;off<=flex;off++){
+    let d=new Date(base);d.setDate(base.getDate()+off);
+    if(d.getMonth()===mi && (!weekday || d.getDay()===weekday))arr.push(d);
+  }
+  if(!arr.length && base.getMonth()===mi)arr=[base];
+  return arr;
 }
 
-async function generatePlanning(){await saveSettingsNow(false);let lockedVisits=state.planning.filter(p=>p.locked&&p.date&&p.date!=="NON PLACÉ");state.planning=[...lockedVisits];let jobs=[];state.clients.forEach(c=>expandClientJobs(c).forEach((j,k)=>jobs.push({c:migrateClient(c),month:j.month,duration:j.duration,k})));jobs.sort((a,b)=>((a.c.allowedDays||[]).length+(a.c.placementMode==="indifferent"?2:0))-((b.c.allowedDays||[]).length+(b.c.placementMode==="indifferent"?2:0)));let blocked=blockedSet(),y=state.settings.year;for(let j of jobs){let c=j.c,dates=j.targetDate?targetDatesAround(j.targetDate,j.month):candDates(y,j.month,c.monthPosition);if(!j.targetDate&&j.k>0)dates=dates.concat(candDates(y,j.month,"Indifférent"));let poss=[];for(let d of dates){let iso=toISO(d),dow=d.getDay();if(dow===0||blocked.has(iso)||!(c.allowedDays||[]).includes(dow)||!gapOK(c,iso)||clientAlreadyThisDay(c.name,iso))continue;if(j.weekday&&dow!==j.weekday)continue;let list=compatibleSlots(c,dow,j.duration,j);
-if(!list.length && state.settings.forcePlacement==="true")list=fallbackSlots(c,dow,j.duration,j);
-list.forEach(s=>{let key=s[4];if(used(iso,key)+j.duration<=slotHours(s))poss.push({date:iso,slot:s,slotKey:key,score:geo(iso,c),relaxed:key.startsWith("forced")||s[0]==="Hors consigne"})})}poss.sort((a,b)=>a.score-b.score||a.date.localeCompare(b.date));if(poss.length){let p=poss[0];state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:p.date,slot:makeActualSlot(p.slot,p.date,p.slotKey,j.duration),slotKey:p.slotKey,client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false,relaxed:p.relaxed||false})}else{
- if(state.settings.forcePlacement==="true"){
-  let allMonth=candDates(y,j.month,"Indifférent");
-  let placed=false;
-  for(let d of allMonth){
-    let iso=toISO(d),dow=d.getDay();
-    if(dow===0||blocked.has(iso)||clientAlreadyThisDay(c.name,iso))continue;
-    let s=fallbackSlots(c,dow,j.duration,j)[0];
-    state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:iso,slot:makeActualSlot(s,iso,s[4],j.duration),slotKey:s[4],client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false,relaxed:true});
-    placed=true;break;
+
+function previousClientVisitInMonth(client,month){
+  let visits=state.planning
+    .filter(p=>p.client===client && p.date && p.date!=="NON PLACÉ" && parseInt(p.date.slice(5,7))-1===month)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  return visits.length?visits[visits.length-1]:null;
+}
+function consecutiveDatesAfter(prevDate,month,gap){
+  let arr=[];
+  let base=parseDate(prevDate);
+  for(let off=1;off<=gap;off++){
+    let d=new Date(base);
+    d.setDate(base.getDate()+off);
+    if(d.getMonth()===month)arr.push(d);
   }
-  if(!placed)state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:"NON PLACÉ",slot:"",slotKey:"",client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false});
- }else state.planning.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),date:"NON PLACÉ",slot:"",slotKey:"",client:c.name,type:c.type,duration:j.duration,revenue:revenueFor(c,j.duration),address:c.address,lat:c.lat,lng:c.lng,linkedGroup:c.linkedGroup||"",neighborOrder:c.neighborOrder||"",locked:false,manual:false});
-}}sortPlanningWithNeighbors();renderPlanning();renderTurnover();mapDate.innerHTML="";scheduleAutosave("planning")}
-function renderPlanning(){if(viewMode.value==="calendar"){planningTable.innerHTML="";renderCalendar();return}if(viewMode.value==="week"){planningTable.innerHTML="";renderWeek();return}calendarView.innerHTML="";let placed=state.planning.filter(p=>p.date!=="NON PLACÉ"),total=placed.reduce((a,p)=>a+p.revenue,0),cesu=placed.filter(p=>p.type==="CESU").reduce((a,p)=>a+p.revenue,0),non=state.planning.length-placed.length;summary.innerHTML=`<div class="${non?'warn':'ok'}">CA placé : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Non placés : <b>${non}</b><br>Placés hors consigne / décalés : <b>${state.planning.filter(p=>p.relaxed).length}</b></div>`;let h="<table><tr><th>Date</th><th>Créneau</th><th>Client</th><th>Type</th><th>Durée</th><th>CA</th><th>Statut</th></tr>";state.planning.forEach(p=>h+=`<tr><td>${p.date}</td><td>${p.slot}</td><td>${p.client}</td><td>${p.type}</td><td>${p.duration} h</td><td>${p.revenue.toFixed(0)}€</td><td>${p.locked?"🔒":""}${p.manual?" manuel":""}${p.relaxed?" hors consigne":""}</td></tr>`);planningTable.innerHTML=h+"</table>";refreshVisitEditSelect();refreshClientPdfSelect()}
-function renderCalendar(){let mi=+calendarMonth.value,y=state.settings.year,last=new Date(y,mi+1,0).getDate(),first=new Date(y,mi,1).getDay(),off=first===0?6:first-1;let h=`<h3>${monthNames[mi]} ${y}</h3><div class="monthGrid">`;["L","M","M","J","V","S","D"].forEach(d=>h+=`<div class="dayCell"><b>${d}</b></div>`);for(let i=0;i<off;i++)h+=`<div class="dayCell"></div>`;for(let day=1;day<=last;day++){let iso=toISO(new Date(y,mi,day)),ev=state.planning.filter(p=>p.date===iso);h+=`<div class="dayCell"><div class="dayNum">${day}</div>`;ev.forEach(e=>h+=`<div class="event">${e.locked?"🔒 ":""}${e.slot}<br>${e.client}</div>`);h+="</div>"}calendarView.innerHTML=h+"</div>";summary.innerHTML="";planningTable.innerHTML=""}
+  return arr;
+}
+
+async function generatePlanning(){
+  await saveSettingsNow(false);
+
+  let lockedVisits=state.planning.filter(p=>p.locked&&p.date&&p.date!=="NON PLACÉ");
+  state.planning=[...lockedVisits];
+
+  let jobs=[];
+  state.clients.forEach(c=>{
+    let mc=migrateClient(c);
+    expandClientJobs(mc).forEach((j,k)=>{
+      jobs.push({c:mc,month:j.month,duration:j.duration,k,targetDate:j.targetDate||null,weekday:j.weekday||null,placement:j.placement||null,forcedStart:j.forcedStart||null,forcedEnd:j.forcedEnd||null,secondary:j.secondary||false,exception:j.exception||false});
+    });
+  });
+
+  // Priorité : horaires forcés et 2e fréquence d'abord, puis contraintes fortes
+  jobs.sort((a,b)=>{
+    let ap=(a.placement==="forcer"||a.c.placementMode==="forcer"||a.secondary)?0:1;
+    let bp=(b.placement==="forcer"||b.c.placementMode==="forcer"||b.secondary)?0:1;
+    if(ap!==bp)return ap-bp;
+    return ((a.c.allowedDays||[]).length)-((b.c.allowedDays||[]).length);
+  });
+
+  let blocked=blockedSet(), y=state.settings.year;
+
+  for(let j of jobs){
+    let c=j.c;
+    let prevConsecutive=c.useConsecutiveVisits?previousClientVisitInMonth(c.name,j.month):null;
+    let dates;
+    if(prevConsecutive && !j.targetDate){
+      dates=consecutiveDatesAfter(prevConsecutive.date,j.month,c.consecutiveGap||1);
+      if(!dates.length && c.consecutiveMode==="sameweek")dates=targetDatesAround(prevConsecutive.date,j.month,null);
+      if(!dates.length)dates=candDates(y,j.month,c.monthPosition);
+    }else{
+      dates=j.targetDate ? targetDatesAround(j.targetDate,j.month,j.weekday) : candDates(y,j.month,c.monthPosition);
+    }
+    if(!j.targetDate && j.k>0) dates=dates.concat(candDates(y,j.month,"Indifférent"));
+
+    let poss=[];
+
+    // Passe 1 : contraintes strictes
+    for(let d of dates){
+      let iso=toISO(d), dow=d.getDay();
+      if(dow===0||blocked.has(iso))continue;
+      if(j.weekday && dow!==j.weekday)continue;
+      if(!j.weekday && !(c.allowedDays||[]).includes(dow))continue;
+      if(clientAlreadyThisDay(c.name,iso))continue;
+      if(!prevConsecutive && !gapOK(c,iso))continue;
+
+      let list=compatibleSlots(c,dow,j.duration,j);
+      list.forEach(s=>{
+        let key=s[4];
+        if(used(iso,key)+j.duration<=slotHours(s)){
+          poss.push({date:iso,slot:s,slotKey:key,score:geo(iso,c),relaxed:false});
+        }
+      });
+    }
+
+    // Passe 2 : si pas trouvé, autorise décalage mais garde jour imposé/jours autorisés
+    if(!poss.length && state.settings.forcePlacement==="true"){
+      let relaxedDates=j.weekday ? targetDatesAround(j.targetDate||toISO(new Date(y,j.month,1)),j.month,j.weekday) : candDates(y,j.month,"Indifférent");
+      for(let d of relaxedDates){
+        let iso=toISO(d), dow=d.getDay();
+        if(dow===0||blocked.has(iso))continue;
+        if(j.weekday && dow!==j.weekday)continue;
+        if(!j.weekday && !(c.allowedDays||[]).includes(dow))continue;
+        if(clientAlreadyThisDay(c.name,iso))continue;
+
+        let list=compatibleSlots(c,dow,j.duration,j);
+        if(!list.length) list=fallbackSlots(c,dow,j.duration,j);
+        list.forEach(s=>{
+          let key=s[4];
+          if(used(iso,key)+j.duration<=slotHours(s)){
+            poss.push({date:iso,slot:s,slotKey:key,score:geo(iso,c)+20,relaxed:true});
+          }
+        });
+      }
+    }
+
+    // Passe 3 : dernier recours uniquement, mais jamais plusieurs fois le même client le même jour
+    if(!poss.length && state.settings.forcePlacement==="true"){
+      let anyDates=candDates(y,j.month,"Indifférent");
+      for(let d of anyDates){
+        let iso=toISO(d), dow=d.getDay();
+        if(dow===0||blocked.has(iso)||clientAlreadyThisDay(c.name,iso))continue;
+        let s=fallbackSlots(c,dow,j.duration,j)[0];
+        if(used(iso,s[4])+j.duration<=slotHours(s)){
+          poss.push({date:iso,slot:s,slotKey:s[4],score:geo(iso,c)+100,relaxed:true});
+          break;
+        }
+      }
+    }
+
+    poss.sort((a,b)=>a.score-b.score||a.date.localeCompare(b.date)||slotStart(`${a.slot[0]} ${a.slot[1]}-${a.slot[2]}`)-slotStart(`${b.slot[0]} ${b.slot[1]}-${b.slot[2]}`));
+
+    if(poss.length){
+      let pp=poss[0];
+      state.planning.push({
+        id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),
+        date:pp.date,
+        slot:makeActualSlot(pp.slot,pp.date,pp.slotKey,j.duration),
+        slotKey:pp.slotKey,
+        client:c.name,
+        type:c.type,
+        duration:j.duration,
+        revenue:revenueFor(c,j.duration),
+        address:c.address,
+        lat:c.lat,
+        lng:c.lng,
+        linkedGroup:c.linkedGroup||"",
+        neighborOrder:c.neighborOrder||"",
+        locked:false,
+        manual:false,
+        relaxed:pp.relaxed||false,
+        secondary:j.secondary||false
+      });
+    }else{
+      state.planning.push({
+        id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),
+        date:"NON PLACÉ",
+        slot:"",
+        slotKey:"",
+        client:c.name,
+        type:c.type,
+        duration:j.duration,
+        revenue:revenueFor(c,j.duration),
+        address:c.address,
+        lat:c.lat,
+        lng:c.lng,
+        linkedGroup:c.linkedGroup||"",
+        neighborOrder:c.neighborOrder||"",
+        locked:false,
+        manual:false
+      });
+    }
+  }
+
+  sortPlanningWithNeighbors();
+  renderPlanning();
+  renderTurnover();
+  if(document.getElementById("mapDate"))mapDate.innerHTML="";
+  scheduleAutosave("planning");
+}
+function renderPlanning(){if(viewMode.value==="calendar"){planningTable.innerHTML="";renderCalendar();return}if(viewMode.value==="week"){planningTable.innerHTML="";renderWeek();return}calendarView.innerHTML="";let placed=state.planning.filter(p=>p.date!=="NON PLACÉ"),total=placed.reduce((a,p)=>a+p.revenue,0),cesu=placed.filter(p=>p.type==="CESU").reduce((a,p)=>a+p.revenue,0),non=state.planning.length-placed.length;summary.innerHTML=`<div class="${non?'warn':'ok'}">CA placé : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Non placés : <b>${non}</b><br>Placés hors consigne / décalés : <b>${state.planning.filter(p=>p.relaxed).length}</b></div>`;let h="<table><tr><th>Date</th><th>Créneau</th><th>Client</th><th>Type</th><th>Durée</th><th>CA</th><th>Statut</th></tr>";state.planning.forEach(p=>h+=`<tr><td>${p.date}</td><td>${p.slot}</td><td>${p.client}</td><td>${p.type}</td><td>${p.duration} h</td><td>${p.revenue.toFixed(0)}€</td><td>${p.locked?"🔒":""}${p.manual?" manuel":""}${p.secondary?" 2e fréquence":""}${p.relaxed?" hors consigne":""}</td></tr>`);planningTable.innerHTML=h+"</table>";refreshVisitEditSelect();refreshClientPdfSelect()}
+function renderCalendar(){let mi=+calendarMonth.value,y=state.settings.year,last=new Date(y,mi+1,0).getDate(),first=new Date(y,mi,1).getDay(),off=first===0?6:first-1;let h=`<h3>${monthNames[mi]} ${y}</h3><div class="monthGrid">`;["L","M","M","J","V","S","D"].forEach(d=>h+=`<div class="dayCell"><b>${d}</b></div>`);for(let i=0;i<off;i++)h+=`<div class="dayCell"></div>`;for(let day=1;day<=last;day++){let iso=toISO(new Date(y,mi,day)),ev=state.planning.filter(p=>p.date===iso).sort((a,b)=>slotRank(a.slot)-slotRank(b.slot)||slotStart(a.slot)-slotStart(b.slot));h+=`<div class="dayCell"><div class="dayNum">${day}</div>`;ev.forEach(e=>h+=`<div class="event">${e.locked?"🔒 ":""}${e.slot}<br>${e.client}</div>`);h+="</div>"}calendarView.innerHTML=h+"</div>";summary.innerHTML="";planningTable.innerHTML=""}
 function renderTurnover(){let m=Array.from({length:12},()=>({cesu:0,ent:0,hours:0,total:0}));state.planning.filter(p=>p.date!=="NON PLACÉ").forEach(p=>{let i=+p.date.slice(5,7)-1;m[i].hours+=p.duration;m[i].total+=p.revenue;p.type==="CESU"?m[i].cesu+=p.revenue:m[i].ent+=p.revenue});let total=m.reduce((a,x)=>a+x.total,0),cesu=m.reduce((a,x)=>a+x.cesu,0),hours=m.reduce((a,x)=>a+x.hours,0);turnoverSummary.innerHTML=`<div class="ok">CA annuel : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Heures : <b>${hours.toFixed(0)} h</b></div>`;let h="<table><tr><th>Mois</th><th>CESU</th><th>Entreprise</th><th>Total</th><th>Heures</th></tr>";m.forEach((x,i)=>h+=`<tr><td>${monthNames[i]}</td><td>${x.cesu.toFixed(0)}€</td><td>${x.ent.toFixed(0)}€</td><td><b>${x.total.toFixed(0)}€</b></td><td>${x.hours.toFixed(0)}h</td></tr>`);turnoverTable.innerHTML=h+"</table>"}
 function printPlanning(){showTab("planning");setTimeout(()=>window.print(),300)}
 function backupObject(){return{app:"Un Coup de Pousse PWA",version:APP_VERSION,exportedAt:new Date().toISOString(),settings:state.settings,clients:state.clients,planning:state.planning}}
 let autosaveTimer=null;function scheduleAutosave(r){if(autosaveTimer)clearTimeout(autosaveTimer);autosaveHeader.innerText="Auto-sauvegarde en attente…";autosaveTimer=setTimeout(()=>autoSave(r),800)}
-async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v13",id);updateAutoSaveHeader();renderBackupStatus()}
+async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v15",id);updateAutoSaveHeader();renderBackupStatus()}
 async function cleanupAutosaves(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));for(let i=12;i<all.length;i++)await del("autosaves",all[i].id)}
-function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v13");autosaveHeader.innerText=l?`Version 13 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 13 — pas encore sauvegardé"}
+function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v15");autosaveHeader.innerText=l?`Version 15 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 15 — pas encore sauvegardé"}
 async function renderBackupStatus(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));backupStatus.innerHTML=`<div class="ok">Clients : <b>${state.clients.length}</b><br>Copies locales : <b>${all.length}</b></div>`;autosaveList.innerHTML=all.map(a=>`<div class="client"><b>${new Date(a.id).toLocaleString("fr-FR")}</b><br><span class="small">${a.reason||""}</span><br><button onclick="restoreAutosave('${a.id}')">Restaurer</button><button onclick="downloadAutosave('${a.id}')">Télécharger</button></div>`).join("")}
 function download(name,txt,type){let b=new Blob([txt],{type}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 function exportBackup(){download("sauvegarde_ucdp.json",JSON.stringify(backupObject(),null,2),"application/json")}
@@ -368,17 +507,33 @@ async function applyBackup(b){await clearStore("settings");await clearStore("cli
 function esc(v){return `"${String(v??"").replaceAll('"','""')}"`}function exportPlanningCSV(){if(!state.planning.length)generatePlanning();let rows=[["Date","Créneau","Client","Type","Durée","CA","Adresse"]];state.planning.forEach(p=>rows.push([p.date,p.slot,p.client,p.type,p.duration,p.revenue,p.address]));download("planning_ucdp.csv","\ufeff"+rows.map(r=>r.map(esc).join(";")).join("\n"),"text/csv")}
 
 
+function slotRank(slot){
+  if(!slot)return 99;
+  if(slot.includes("Matin"))return 1;
+  if(slot.includes("Après-midi"))return 2;
+  if(slot.includes("Forcé"))return 3;
+  return 4;
+}
+function slotStart(slot){
+  let m=(slot||"").match(/(\d{2}:\d{2})/);
+  if(!m)return 9999;
+  return mins(m[1]);
+}
 function sortPlanningWithNeighbors(){
   state.planning.sort((a,b)=>{
     let d=(a.date||"").localeCompare(b.date||"");
     if(d!==0)return d;
+    let r=slotRank(a.slot)-slotRank(b.slot);
+    if(r!==0)return r;
+    let st=slotStart(a.slot)-slotStart(b.slot);
+    if(st!==0)return st;
     if(a.linkedGroup&&b.linkedGroup&&a.linkedGroup===b.linkedGroup){
       if(a.neighborOrder==="before"&&b.neighborOrder!=="before")return -1;
       if(a.neighborOrder==="after"&&b.neighborOrder!=="after")return 1;
       if(b.neighborOrder==="before"&&a.neighborOrder!=="before")return 1;
       if(b.neighborOrder==="after"&&a.neighborOrder!=="after")return -1;
     }
-    return (a.slot||"").localeCompare(b.slot||"");
+    return (a.client||"").localeCompare(b.client||"");
   });
 }
 function refreshVisitEditSelect(){
@@ -564,7 +719,7 @@ function renderMapLinks(){
   mapLinks.innerHTML=html;
 }
 
-if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=13").then(r=>r.update()).catch(()=>{})}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=15").then(r=>r.update()).catch(()=>{})}
 openDB().then(loadAll);
 </script>
 </body>
