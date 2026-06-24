@@ -39,14 +39,14 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 <body>
 <header>
 <h1>Un Coup de Pousse — Planning</h1>
-<div class="status" id="autosaveHeader">Version 20</div>
+<div class="status" id="autosaveHeader">Version 21</div>
 <div class="tabs">
 <button onclick="showTab('home')">Accueil</button><button onclick="showTab('clients')">Clients</button><button onclick="showTab('planning')">Planning</button><button onclick="showTab('turnover')">CA</button><button onclick="showTab('map')">Carte</button><button onclick="showTab('backup')">Sauvegarde</button>
 </div>
 </header>
 <main>
 <section id="home" class="card">
-<h2>Accueil / Réglages</h2><div class="ok"><b>Version 20 installée</b> — fréquences spéciales, génération consolidée et affichage planning séparé.</div>
+<h2>Accueil / Réglages</h2><div class="ok"><b>Version 21 installée</b> — fréquences spéciales, correctif moteur planning et affichage séparé propre.</div>
 <div class="row"><div><label>Année</label><input id="year" type="number" value="2027"></div><div><label>Adresse départ</label><input id="homeAddress" placeholder="Montescot, France"></div></div>
 <div class="row"><div><label>Latitude départ</label><input id="homeLat" type="number" step="0.000001"></div><div><label>Longitude départ</label><input id="homeLng" type="number" step="0.000001"></div></div>
 <label>Clé API OpenRouteService</label><input id="orsApiKey" placeholder="Colle ta clé OpenRouteService ici">
@@ -146,6 +146,9 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 <div class="row"><div><label>Mois / semaine</label><select id="calendarMonth" onchange="renderPlanning()"></select></div><div><label>Vue</label><select id="viewMode" onchange="renderPlanning()"><option value="table">Tableau</option><option value="calendar">Calendrier mois</option><option value="week">Vue semaine</option></select></div></div>
 <button onclick="generatePlanning()">Générer l’année</button><button class="light" onclick="clearPlanningOnly()">Vider planning</button><button class="light" onclick="exportPlanningCSV()">Export CSV</button><button class="light" onclick="printPlanning()">PDF / imprimer</button>
 
+<details class="dropdown"><summary>Modifier un rendez-vous</summary>
+
+<div id="generationStatus"></div><h3>Affichage du planning</h3><div id="summary"></div><div id="planningTable" class="tablewrap"></div><div id="calendarView"></div>
 <details class="dropdown"><summary>Modifier un rendez-vous</summary><div class="slot">
 <p class="small">Sélectionne un rendez-vous généré, puis change la date ou le créneau. Tu peux aussi le verrouiller pour éviter de le perdre.</p>
 <div class="row">
@@ -157,8 +160,7 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 <div><label>Verrouillé</label><select id="editVisitLocked"><option value="false">Non</option><option value="true">Oui</option></select></div>
 </div>
 <button onclick="applyVisitEdit()">Appliquer</button>
-</div>
-
+</div></details>
 <div class="slot">
 <b>Planning client / email</b>
 <div class="row">
@@ -168,7 +170,7 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 <button onclick="clientActionRun()">Lancer</button>
 <div id="clientPdfPrint" class="hidden"></div>
 </div>
-<div id="generationStatus"></div><h3>Affichage du planning</h3><div id="summary"></div><div id="planningTable" class="tablewrap"></div><div id="calendarView"></div>
+
 </section>
 
 <section id="turnover" class="card hidden"><h2>Chiffre d’affaires global</h2><button onclick="renderTurnover()">Actualiser le CA</button><div id="turnoverSummary"></div><div id="turnoverTable" class="tablewrap"></div></section>
@@ -191,7 +193,7 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 </main>
 
 <script>
-const APP_VERSION="20.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
+const APP_VERSION="21.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
 let db=null,state={settings:null,clients:[],planning:[]};
 const monthNames=["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"],dayNames={1:"Lundi",2:"Mardi",3:"Mercredi",4:"Jeudi",5:"Vendredi",6:"Samedi"};
 function showTab(id){["home","clients","planning","turnover","map","backup"].forEach(x=>document.getElementById(x).classList.add("hidden"));document.getElementById(id).classList.remove("hidden");if(id==="backup")renderBackupStatus();if(id==="turnover")renderTurnover();if(id==="planning")renderPlanning();if(id==="map")renderMapLinks()}
@@ -418,9 +420,32 @@ function clientAlreadyThisDay(client,date){
   return state.planning.some(p=>p.client===client && p.date===date);
 }
 
+function compatibleSlots(c,dow,dur,job=null){
+  let placement=job?.placement||c.placementMode;
+  let fStart=job?.forcedStart||c.forcedStart;
+  let fEnd=job?.forcedEnd||c.forcedEnd;
+  let slots=state.settings.slots[dow]||[];
+  if(placement==="forcer")return [["Forcé",fStart,fEnd,true,"forced-"+fStart+"-"+fEnd]];
+  return slots.map((s,i)=>[s[0],s[1],s[2],s[3],String(i)])
+    .filter(s=>s[3]&&slotHours(s)>=dur&&(
+      placement==="indifferent"||
+      (placement==="matin"&&s[0]==="Matin")||
+      (placement==="apresmidi"&&s[0]==="Après-midi")
+    ));
+}
+function fallbackSlots(c,dow,dur,job=null){
+  let slots=state.settings.slots[dow]||[];
+  let placement=job?.placement||c.placementMode;
+  let fStart=job?.forcedStart||c.forcedStart;
+  let fEnd=job?.forcedEnd||c.forcedEnd;
+  let normal=slots.map((s,i)=>[s[0],s[1],s[2],s[3],String(i)]).filter(s=>s[3]&&slotHours(s)>=dur);
+  if(placement==="forcer")return [["Forcé",fStart,fEnd,true,"forced-"+fStart+"-"+fEnd]];
+  if(normal.length)return normal;
+  return [["Hors consigne","08:00",String(8+dur).padStart(2,"0")+":00",true,"fallback-"+dow+"-"+dur]];
+}
 async function generatePlanning(){
   try{
-    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Génération en cours...</div>';
+    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Génération en cours...</div>';
 
   await saveSettingsNow(false);
 
@@ -564,9 +589,9 @@ async function generatePlanning(){
   if(document.getElementById("mapDate"))mapDate.innerHTML="";
   scheduleAutosave("planning");
 
-    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="ok">Planning généré.</div>';
+    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="ok">Planning généré.</div>';
   }catch(err){
-    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Erreur génération : '+err.message+'</div>';
+    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Erreur génération : '+err.message+'</div>';
     console.warn('Erreur génération : '+err.message);
     console.error(err);
   }
@@ -577,9 +602,9 @@ function renderTurnover(){let m=Array.from({length:12},()=>({cesu:0,ent:0,hours:
 function printPlanning(){showTab("planning");setTimeout(()=>window.print(),300)}
 function backupObject(){return{app:"Un Coup de Pousse PWA",version:APP_VERSION,exportedAt:new Date().toISOString(),settings:state.settings,clients:state.clients,planning:state.planning}}
 let autosaveTimer=null;function scheduleAutosave(r){if(autosaveTimer)clearTimeout(autosaveTimer);autosaveHeader.innerText="Auto-sauvegarde en attente…";autosaveTimer=setTimeout(()=>autoSave(r),800)}
-async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v20",id);updateAutoSaveHeader();renderBackupStatus()}
+async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v21",id);updateAutoSaveHeader();renderBackupStatus()}
 async function cleanupAutosaves(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));for(let i=12;i<all.length;i++)await del("autosaves",all[i].id)}
-function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v20");autosaveHeader.innerText=l?`Version 20 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 20 — pas encore sauvegardé"}
+function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v21");autosaveHeader.innerText=l?`Version 21 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 21 — pas encore sauvegardé"}
 async function renderBackupStatus(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));backupStatus.innerHTML=`<div class="ok">Clients : <b>${state.clients.length}</b><br>Copies locales : <b>${all.length}</b></div>`;autosaveList.innerHTML=all.map(a=>`<div class="client"><b>${new Date(a.id).toLocaleString("fr-FR")}</b><br><span class="small">${a.reason||""}</span><br><button onclick="restoreAutosave('${a.id}')">Restaurer</button><button onclick="downloadAutosave('${a.id}')">Télécharger</button></div>`).join("")}
 function download(name,txt,type){let b=new Blob([txt],{type}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 function exportBackup(){download("sauvegarde_ucdp.json",JSON.stringify(backupObject(),null,2),"application/json")}
@@ -803,7 +828,7 @@ function renderMapLinks(){
   mapLinks.innerHTML=html;
 }
 
-if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=20").then(r=>r.update()).catch(()=>{})}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=21").then(r=>r.update()).catch(()=>{})}
 openDB().then(loadAll);
 </script>
 </body>

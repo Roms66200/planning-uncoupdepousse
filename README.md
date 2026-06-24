@@ -1,8 +1,8 @@
-# UCDP Planning V20
+# UCDP Planning V21
 
 Correctifs :
-- Consolidation des fonctions internes de génération.
-- Planning vidé proprement avant génération.
-- Erreurs affichées dans la page.
-- Affichage du planning séparé de “Modifier un rendez-vous”.
+- Ajout/consolidation de compatibleSlots et fallbackSlots.
+- Affichage du planning placé avant les outils de modification.
+- Zone “Modifier un rendez-vous” séparée.
+- Zone “Planning client / email” séparée.
 - Vérification syntaxe JavaScript effectuée.
