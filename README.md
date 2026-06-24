@@ -1,7 +1,7 @@
-# UCDP Planning V18
+# UCDP Planning V19
 
-Correctif :
-- Restaure la fonction clientAlreadyThisDay qui faisait planter la génération.
-- La génération automatique après modification client reste active.
-- Le diagnostic reste visible.
+Correctifs :
+- Ajout de la fonction gapOK qui faisait planter la génération.
+- Horaires de travail mis dans un menu déroulant.
+- Modifier un rendez-vous mis dans un menu déroulant.
 - Vérification syntaxe JavaScript effectuée.
