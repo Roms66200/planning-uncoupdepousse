@@ -35,14 +35,14 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <body>
 <header>
 <h1>Un Coup de Pousse — Planning</h1>
-<div class="status" id="autosaveHeader">Version 15</div>
+<div class="status" id="autosaveHeader">Version 17</div>
 <div class="tabs">
 <button onclick="showTab('home')">Accueil</button><button onclick="showTab('clients')">Clients</button><button onclick="showTab('planning')">Planning</button><button onclick="showTab('turnover')">CA</button><button onclick="showTab('map')">Carte</button><button onclick="showTab('backup')">Sauvegarde</button>
 </div>
 </header>
 <main>
 <section id="home" class="card">
-<h2>Accueil / Réglages</h2><div class="ok"><b>Version 15 installée</b> — fréquences spéciales, enchaînement des passages d’un même client, jours stricts et tri matin/après-midi.</div>
+<h2>Accueil / Réglages</h2><div class="ok"><b>Version 17 installée</b> — fréquences spéciales, planning automatique après modification client et diagnostic immédiat.</div>
 <div class="row"><div><label>Année</label><input id="year" type="number" value="2027"></div><div><label>Adresse départ</label><input id="homeAddress" placeholder="Montescot, France"></div></div>
 <div class="row"><div><label>Latitude départ</label><input id="homeLat" type="number" step="0.000001"></div><div><label>Longitude départ</label><input id="homeLng" type="number" step="0.000001"></div></div>
 <label>Clé API OpenRouteService</label><input id="orsApiKey" placeholder="Colle ta clé OpenRouteService ici">
@@ -56,6 +56,16 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <div class="row">
 <div><label>Décalage autorisé</label><select id="planningFlexDays"><option value="0">Aucun</option><option value="3">± 3 jours</option><option value="7" selected>± 7 jours</option><option value="14">± 14 jours</option><option value="30">Tout le mois</option></select></div>
 <div><label>Forcer placement</label><select id="forcePlacement"><option value="true" selected>Oui, mais en dernier recours</option><option value="false">Non, strict</option></select></div>
+</div>
+</div>
+
+
+<div class="slot">
+<b>Génération automatique</b>
+<p class="small">Après chaque modification client, le planning peut être régénéré automatiquement.</p>
+<div class="row">
+<div><label>Après enregistrement</label><select id="autoGenerateAfterSave"><option value="true" selected>Régénérer automatiquement</option><option value="false">Manuel</option></select></div>
+<div><label>Diagnostic client</label><select id="showClientDiagnostic"><option value="true" selected>Afficher</option><option value="false">Masquer</option></select></div>
 </div>
 </div>
 
@@ -124,13 +134,13 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <label>Écart minimum entre passages</label><input id="minGap" type="number" value="7">
 <label>Jours autorisés</label><div class="days" id="allowedDays"><label><input type="checkbox" value="1" checked>Lun</label><label><input type="checkbox" value="2" checked>Mar</label><label><input type="checkbox" value="3" checked>Mer</label><label><input type="checkbox" value="4" checked>Jeu</label><label><input type="checkbox" value="5" checked>Ven</label><label><input type="checkbox" value="6" checked>Sam</label></div>
 <label>Notes</label><textarea id="notes"></textarea>
-<button onclick="saveClient()">Enregistrer client</button><button onclick="resetClientForm()">Nouveau</button><div id="clientStatus"></div><h3>Liste</h3><div id="clientList"></div>
+<button onclick="saveClient()">Enregistrer client</button><button onclick="resetClientForm()">Nouveau</button><div id="clientStatus"></div><div id="clientDiagnostic"></div><h3>Liste</h3><div id="clientList"></div>
 </section>
 
 <section id="planning" class="card hidden">
 <h2>Planning</h2>
 <div class="row"><div><label>Mois / semaine</label><select id="calendarMonth" onchange="renderPlanning()"></select></div><div><label>Vue</label><select id="viewMode" onchange="renderPlanning()"><option value="table">Tableau</option><option value="calendar">Calendrier mois</option><option value="week">Vue semaine</option></select></div></div>
-<button onclick="generatePlanning()">Générer l’année</button><button class="light" onclick="exportPlanningCSV()">Export CSV</button><button class="light" onclick="printPlanning()">PDF / imprimer</button>
+<button onclick="generatePlanning()">Générer l’année</button><button class="light" onclick="clearPlanningOnly()">Vider planning</button><button class="light" onclick="exportPlanningCSV()">Export CSV</button><button class="light" onclick="printPlanning()">PDF / imprimer</button>
 
 <div class="slot">
 <b>Modifier un rendez-vous</b>
@@ -155,7 +165,7 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 <button onclick="clientActionRun()">Lancer</button>
 <div id="clientPdfPrint" class="hidden"></div>
 </div>
-<div id="summary"></div><div id="planningTable" class="tablewrap"></div><div id="calendarView"></div>
+<div id="generationStatus"></div><div id="summary"></div><div id="planningTable" class="tablewrap"></div><div id="calendarView"></div>
 </section>
 
 <section id="turnover" class="card hidden"><h2>Chiffre d’affaires global</h2><button onclick="renderTurnover()">Actualiser le CA</button><div id="turnoverSummary"></div><div id="turnoverTable" class="tablewrap"></div></section>
@@ -178,14 +188,14 @@ input,select,textarea{width:100%;padding:12px;margin-top:6px;border:1px solid #d
 </main>
 
 <script>
-const APP_VERSION="15.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
+const APP_VERSION="17.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
 let db=null,state={settings:null,clients:[],planning:[]};
 const monthNames=["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"],dayNames={1:"Lundi",2:"Mardi",3:"Mercredi",4:"Jeudi",5:"Vendredi",6:"Samedi"};
 function showTab(id){["home","clients","planning","turnover","map","backup"].forEach(x=>document.getElementById(x).classList.add("hidden"));document.getElementById(id).classList.remove("hidden");if(id==="backup")renderBackupStatus();if(id==="turnover")renderTurnover();if(id==="planning")renderPlanning();if(id==="map")renderMapLinks()}
 function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=e=>{let d=e.target.result;if(!d.objectStoreNames.contains("settings"))d.createObjectStore("settings",{keyPath:"id"});if(!d.objectStoreNames.contains("clients"))d.createObjectStore("clients",{keyPath:"id",autoIncrement:true});if(!d.objectStoreNames.contains("autosaves"))d.createObjectStore("autosaves",{keyPath:"id"})};r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=e=>rej(e)})}
 function tx(s,m="readonly"){return db.transaction(s,m).objectStore(s)}function getAll(s){return new Promise(res=>{let r=tx(s).getAll();r.onsuccess=()=>res(r.result||[])})}function put(s,o){return new Promise(res=>{let r=tx(s,"readwrite").put(o);r.onsuccess=()=>res(r.result)})}function del(s,k){return new Promise(res=>{let r=tx(s,"readwrite").delete(k);r.onsuccess=()=>res()})}function clearStore(s){return new Promise(res=>{let r=tx(s,"readwrite").clear();r.onsuccess=()=>res()})}
 function defaultSlots(){return{1:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],2:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],3:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]],4:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],5:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],6:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]]}}
-function defaultSettings(){return{id:"main",year:2027,homeAddress:"",homeLat:null,homeLng:null,blockedDates:"",orsApiKey:"",planningFlexDays:7,forcePlacement:"true",strictDays:"true",slots:defaultSlots()}}
+function defaultSettings(){return{id:"main",year:2027,homeAddress:"",homeLat:null,homeLng:null,blockedDates:"",orsApiKey:"",planningFlexDays:7,forcePlacement:"true",strictDays:"true",autoGenerateAfterSave:"true",showClientDiagnostic:"true",slots:defaultSlots()}}
 function emptyClient(){return{name:"",type:"CESU",address:"",email:"",phone:"",lat:null,lng:null,defaultDuration:4,priceMode:"visit",price:300,placementMode:"matin",forcedStart:"12:00",forcedEnd:"14:00",linkedGroup:"",neighborOrder:"",useSecondFrequency:false,useConsecutiveVisits:false,consecutiveMode:"nextday",consecutiveGap:1,secondStartMonth:3,secondEndMonth:9,secondWeeks:1,secondWeekday:3,secondDuration:2,secondPlacement:"forcer",secondForcedStart:"16:00",secondForcedEnd:"18:00",frequencyMode:"monthly",monthlyVisits:Array(12).fill(0),monthlyDurations:Array(12).fill(4),intervalStartMonth:2,intervalEndMonth:9,intervalWeeks:3,intervalDuration:4,specialMonths:Array.from({length:12},()=>({visits:0,duration:4})),exceptionMonths:Array.from({length:12},()=>({visits:0,duration:8})),monthPosition:"Indifférent",minGap:7,allowedDays:[1,2,3,4,5,6],notes:""}}
 function migrateClient(c){let n={...emptyClient(),...c};if(c.months&&!c.monthlyVisits)n.monthlyVisits=c.months;if(c.duration&&!c.defaultDuration)n.defaultDuration=c.duration;if(n.type!=="Entreprise")n.type="CESU";if(!n.specialMonths)n.specialMonths=Array.from({length:12},(_,i)=>({visits:n.monthlyVisits?.[i]||0,duration:n.defaultDuration||4}));if(!n.exceptionMonths)n.exceptionMonths=Array.from({length:12},()=>({visits:0,duration:8}));return n}
 async function loadAll(){let s=await getAll("settings");state.settings=s[0]||defaultSettings();if(!s[0])await put("settings",state.settings);state.clients=(await getAll("clients")).map(migrateClient);renderAll();scheduleAutosave("chargement")}
@@ -193,9 +203,9 @@ function renderAll(){buildSlots();buildMonths();buildCalendarMonth();renderSetti
 function buildSlots(){let w=slots;w.innerHTML="";let sl=state.settings?.slots||defaultSlots();for(let d=1;d<=6;d++){let h=`<div class="slot"><b>${dayNames[d]}</b>`;(sl[d]||defaultSlots()[d]).slice(0,2).forEach((s,i)=>{let n=i===0?"Matin":"Après-midi";h+=`<label>${n}</label><div class="row"><input id="slot_${d}_${i}_start" type="time" value="${s[1]}"><input id="slot_${d}_${i}_end" type="time" value="${s[2]}"></div><label><input id="slot_${d}_${i}_active" type="checkbox" ${s[3]?"checked":""}> ${n} actif</label>`});w.innerHTML+=h+"</div>"}}
 function buildMonths(){monthlyVisits.innerHTML="";specialMonths.innerHTML="";exceptionMonths.innerHTML="";monthNames.forEach((m,i)=>{monthlyVisits.innerHTML+=`<div><label>${m}</label><input id="mv${i}" type="number" min="0" max="4" value="0"></div>`;specialMonths.innerHTML+=`<div class="row"><div><label>${m} passages</label><input id="spv${i}" type="number" min="0" max="4" value="0"></div><div><label>${m} durée</label><select id="spd${i}"><option value="2">2 h</option><option value="4" selected>4 h</option><option value="8">8 h</option></select></div></div>`;exceptionMonths.innerHTML+=`<div class="row"><div><label>${m} extra</label><input id="exv${i}" type="number" min="0" max="4" value="0"></div><div><label>${m} durée extra</label><select id="exd${i}"><option value="2">2 h</option><option value="4">4 h</option><option value="8" selected>8 h</option></select></div></div>`})}
 function buildCalendarMonth(){calendarMonth.innerHTML=intervalStartMonth.innerHTML=intervalEndMonth.innerHTML=secondStartMonth.innerHTML=secondEndMonth.innerHTML="";monthNames.forEach((m,i)=>{calendarMonth.innerHTML+=`<option value="${i}">${m}</option>`;intervalStartMonth.innerHTML+=`<option value="${i}">${m}</option>`;intervalEndMonth.innerHTML+=`<option value="${i}">${m}</option>`;secondStartMonth.innerHTML+=`<option value="${i}">${m}</option>`;secondEndMonth.innerHTML+=`<option value="${i}">${m}</option>`})}
-function renderSettings(){let s=state.settings;year.value=s.year;homeAddress.value=s.homeAddress||"";homeLat.value=s.homeLat??"";homeLng.value=s.homeLng??"";blockedDates.value=s.blockedDates||"";orsApiKey.value=s.orsApiKey||"";planningFlexDays.value=s.planningFlexDays??7;forcePlacement.value=s.forcePlacement??"true"}
+function renderSettings(){let s=state.settings;year.value=s.year;homeAddress.value=s.homeAddress||"";homeLat.value=s.homeLat??"";homeLng.value=s.homeLng??"";blockedDates.value=s.blockedDates||"";orsApiKey.value=s.orsApiKey||"";planningFlexDays.value=s.planningFlexDays??7;forcePlacement.value=s.forcePlacement??"true";autoGenerateAfterSave.value=s.autoGenerateAfterSave??"true";showClientDiagnostic.value=s.showClientDiagnostic??"true"}
 function getSlotsFromUI(){let out={};for(let d=1;d<=6;d++){out[d]=[];for(let i=0;i<2;i++){let n=i===0?"Matin":"Après-midi";out[d].push([n,document.getElementById(`slot_${d}_${i}_start`).value,document.getElementById(`slot_${d}_${i}_end`).value,document.getElementById(`slot_${d}_${i}_active`).checked])}}return out}
-async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,orsApiKey:orsApiKey.value.trim(),planningFlexDays:+planningFlexDays.value,forcePlacement:forcePlacement.value,strictDays:"true",slots:getSlotsFromUI()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés.</div>'}
+async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,orsApiKey:orsApiKey.value.trim(),planningFlexDays:+planningFlexDays.value,forcePlacement:forcePlacement.value,strictDays:"true",autoGenerateAfterSave:"true",showClientDiagnostic:"true",slots:getSlotsFromUI()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés.</div>'}
 async function applyDefaultSlots(){state.settings.slots=defaultSlots();await put("settings",state.settings);buildSlots();scheduleAutosave("planning type");homeStatus.innerHTML='<div class="ok">Planning type appliqué.</div>'}
 function toggleFrequencyMode(){monthlyBox.classList.toggle("hidden",frequencyMode.value!=="monthly");intervalBox.classList.toggle("hidden",frequencyMode.value!=="interval");specialBox.classList.toggle("hidden",frequencyMode.value!=="special")}
 function toggleForcedTime(){forcedTimeBox.classList.toggle("hidden",!useForcedTime.checked);if(useForcedTime.checked)placementMode.value="forcer";else if(placementMode.value==="forcer")placementMode.value="matin"}
@@ -262,6 +272,7 @@ async function saveClient(){
     resetClientForm();
     renderClients();
     clientStatus.innerHTML='<div class="ok">Client enregistré.</div>';
+    await afterClientSaved(c.name);
     scheduleAutosave("client");
   }catch(err){
     clientStatus.innerHTML='<div class="warn">Erreur enregistrement : '+err.message+'</div>';
@@ -345,11 +356,56 @@ function consecutiveDatesAfter(prevDate,month,gap){
   return arr;
 }
 
+
+
+async function afterClientSaved(clientName){
+  try{
+    if(state.settings?.autoGenerateAfterSave==="true"){
+      if(document.getElementById("generationStatus"))generationStatus.innerHTML='<div class="warn">Mise à jour automatique du planning...</div>';
+      await generatePlanning();
+    }
+    if(state.settings?.showClientDiagnostic!=="false") renderClientDiagnostic(clientName);
+  }catch(err){
+    clientStatus.innerHTML='<div class="warn">Client enregistré, mais génération impossible : '+err.message+'</div>';
+  }
+}
+function renderClientDiagnostic(clientName){
+  let visits=state.planning.filter(p=>p.client===clientName);
+  if(!visits.length){
+    clientDiagnostic.innerHTML='<div class="warn">Diagnostic : aucun rendez-vous généré pour ce client.</div>';
+    return;
+  }
+  let non=visits.filter(p=>p.date==="NON PLACÉ");
+  let relaxed=visits.filter(p=>p.relaxed);
+  let months={};
+  visits.forEach(p=>{
+    let key=p.date==="NON PLACÉ"?"Non placé":p.date.slice(0,7);
+    months[key]=(months[key]||0)+1;
+  });
+  let monthTxt=Object.entries(months).map(([m,n])=>`${m} : ${n}`).join("<br>");
+  let cls=non.length?'warn':'ok';
+  let msg=non.length?`<b>Attention :</b> ${non.length} rendez-vous non placé(s).`:`<b>OK :</b> ${visits.length} rendez-vous généré(s).`;
+  if(relaxed.length)msg+=`<br>${relaxed.length} rendez-vous placé(s) hors consigne ou décalé(s).`;
+  clientDiagnostic.innerHTML=`<div class="${cls}">${msg}<br><br><b>Répartition :</b><br>${monthTxt}</div>`;
+}
+
+function clearPlanningOnly(){
+  if(confirm("Vider uniquement le planning généré ? Les clients restent enregistrés.")){
+    state.planning=[];
+    renderPlanning();
+    renderTurnover();
+    scheduleAutosave("planning vidé");
+    generationStatus.innerHTML='<div class="ok">Planning vidé. Tu peux régénérer proprement.</div>';
+  }
+}
+
 async function generatePlanning(){
+  try{
+    generationStatus.innerHTML='<div class="warn">Génération en cours...</div>';
+
   await saveSettingsNow(false);
 
-  let lockedVisits=state.planning.filter(p=>p.locked&&p.date&&p.date!=="NON PLACÉ");
-  state.planning=[...lockedVisits];
+  state.planning=[];
 
   let jobs=[];
   state.clients.forEach(c=>{
@@ -429,6 +485,8 @@ async function generatePlanning(){
       for(let d of anyDates){
         let iso=toISO(d), dow=d.getDay();
         if(dow===0||blocked.has(iso)||clientAlreadyThisDay(c.name,iso))continue;
+        if(!j.weekday && !(c.allowedDays||[]).includes(dow))continue;
+        if(j.weekday && dow!==j.weekday)continue;
         let s=fallbackSlots(c,dow,j.duration,j)[0];
         if(used(iso,s[4])+j.duration<=slotHours(s)){
           poss.push({date:iso,slot:s,slotKey:s[4],score:geo(iso,c)+100,relaxed:true});
@@ -486,6 +544,13 @@ async function generatePlanning(){
   renderTurnover();
   if(document.getElementById("mapDate"))mapDate.innerHTML="";
   scheduleAutosave("planning");
+
+    generationStatus.innerHTML='<div class="ok">Planning généré.</div>';
+  }catch(err){
+    generationStatus.innerHTML='<div class="warn">Erreur génération : '+err.message+'</div>';
+    alert('Erreur génération : '+err.message);
+    console.error(err);
+  }
 }
 function renderPlanning(){if(viewMode.value==="calendar"){planningTable.innerHTML="";renderCalendar();return}if(viewMode.value==="week"){planningTable.innerHTML="";renderWeek();return}calendarView.innerHTML="";let placed=state.planning.filter(p=>p.date!=="NON PLACÉ"),total=placed.reduce((a,p)=>a+p.revenue,0),cesu=placed.filter(p=>p.type==="CESU").reduce((a,p)=>a+p.revenue,0),non=state.planning.length-placed.length;summary.innerHTML=`<div class="${non?'warn':'ok'}">CA placé : <b>${total.toFixed(0)} €</b><br>CESU : <b>${cesu.toFixed(0)} €</b> — Entreprise : <b>${(total-cesu).toFixed(0)} €</b><br>Non placés : <b>${non}</b><br>Placés hors consigne / décalés : <b>${state.planning.filter(p=>p.relaxed).length}</b></div>`;let h="<table><tr><th>Date</th><th>Créneau</th><th>Client</th><th>Type</th><th>Durée</th><th>CA</th><th>Statut</th></tr>";state.planning.forEach(p=>h+=`<tr><td>${p.date}</td><td>${p.slot}</td><td>${p.client}</td><td>${p.type}</td><td>${p.duration} h</td><td>${p.revenue.toFixed(0)}€</td><td>${p.locked?"🔒":""}${p.manual?" manuel":""}${p.secondary?" 2e fréquence":""}${p.relaxed?" hors consigne":""}</td></tr>`);planningTable.innerHTML=h+"</table>";refreshVisitEditSelect();refreshClientPdfSelect()}
 function renderCalendar(){let mi=+calendarMonth.value,y=state.settings.year,last=new Date(y,mi+1,0).getDate(),first=new Date(y,mi,1).getDay(),off=first===0?6:first-1;let h=`<h3>${monthNames[mi]} ${y}</h3><div class="monthGrid">`;["L","M","M","J","V","S","D"].forEach(d=>h+=`<div class="dayCell"><b>${d}</b></div>`);for(let i=0;i<off;i++)h+=`<div class="dayCell"></div>`;for(let day=1;day<=last;day++){let iso=toISO(new Date(y,mi,day)),ev=state.planning.filter(p=>p.date===iso).sort((a,b)=>slotRank(a.slot)-slotRank(b.slot)||slotStart(a.slot)-slotStart(b.slot));h+=`<div class="dayCell"><div class="dayNum">${day}</div>`;ev.forEach(e=>h+=`<div class="event">${e.locked?"🔒 ":""}${e.slot}<br>${e.client}</div>`);h+="</div>"}calendarView.innerHTML=h+"</div>";summary.innerHTML="";planningTable.innerHTML=""}
@@ -493,9 +558,9 @@ function renderTurnover(){let m=Array.from({length:12},()=>({cesu:0,ent:0,hours:
 function printPlanning(){showTab("planning");setTimeout(()=>window.print(),300)}
 function backupObject(){return{app:"Un Coup de Pousse PWA",version:APP_VERSION,exportedAt:new Date().toISOString(),settings:state.settings,clients:state.clients,planning:state.planning}}
 let autosaveTimer=null;function scheduleAutosave(r){if(autosaveTimer)clearTimeout(autosaveTimer);autosaveHeader.innerText="Auto-sauvegarde en attente…";autosaveTimer=setTimeout(()=>autoSave(r),800)}
-async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v15",id);updateAutoSaveHeader();renderBackupStatus()}
+async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v17",id);updateAutoSaveHeader();renderBackupStatus()}
 async function cleanupAutosaves(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));for(let i=12;i<all.length;i++)await del("autosaves",all[i].id)}
-function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v15");autosaveHeader.innerText=l?`Version 15 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 15 — pas encore sauvegardé"}
+function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v17");autosaveHeader.innerText=l?`Version 17 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 17 — pas encore sauvegardé"}
 async function renderBackupStatus(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));backupStatus.innerHTML=`<div class="ok">Clients : <b>${state.clients.length}</b><br>Copies locales : <b>${all.length}</b></div>`;autosaveList.innerHTML=all.map(a=>`<div class="client"><b>${new Date(a.id).toLocaleString("fr-FR")}</b><br><span class="small">${a.reason||""}</span><br><button onclick="restoreAutosave('${a.id}')">Restaurer</button><button onclick="downloadAutosave('${a.id}')">Télécharger</button></div>`).join("")}
 function download(name,txt,type){let b=new Blob([txt],{type}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 function exportBackup(){download("sauvegarde_ucdp.json",JSON.stringify(backupObject(),null,2),"application/json")}
@@ -719,7 +784,7 @@ function renderMapLinks(){
   mapLinks.innerHTML=html;
 }
 
-if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=15").then(r=>r.update()).catch(()=>{})}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=17").then(r=>r.update()).catch(()=>{})}
 openDB().then(loadAll);
 </script>
 </body>
