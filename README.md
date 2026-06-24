@@ -1,8 +1,8 @@
-# UCDP Planning V21
+# UCDP Planning V22
 
 Correctifs :
-- Ajout/consolidation de compatibleSlots et fallbackSlots.
-- Affichage du planning placé avant les outils de modification.
-- Zone “Modifier un rendez-vous” séparée.
-- Zone “Planning client / email” séparée.
+- Ajout/restauration des fonctions internes used, usedMinutes, hhmm et makeActualSlot.
+- Affichage du planning placé au-dessus de “Modifier un rendez-vous”.
+- Outils de modification et planning client/email placés après l’affichage.
+- Alertes de génération moins bloquantes.
 - Vérification syntaxe JavaScript effectuée.
