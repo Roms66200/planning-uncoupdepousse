@@ -39,14 +39,14 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 <body>
 <header>
 <h1>Un Coup de Pousse — Planning</h1>
-<div class="status" id="autosaveHeader">Version 23</div>
+<div class="status" id="autosaveHeader">Version 24</div>
 <div class="tabs">
 <button onclick="showTab('home')">Accueil</button><button onclick="showTab('clients')">Clients</button><button onclick="showTab('planning')">Planning</button><button onclick="showTab('turnover')">CA</button><button onclick="showTab('map')">Carte</button><button onclick="showTab('backup')">Sauvegarde</button>
 </div>
 </header>
 <main>
 <section id="home" class="card">
-<h2>Accueil / Réglages</h2><div class="ok"><b>Version 23 installée</b> — base stable, génération consolidée, planning affiché avant les outils.</div>
+<h2>Accueil / Réglages</h2><div class="ok"><b>Version 24 installée</b> — base stable, génération consolidée, planning affiché avant les outils.</div>
 <div class="row"><div><label>Année</label><input id="year" type="number" value="2027"></div><div><label>Adresse départ</label><input id="homeAddress" placeholder="Montescot, France"></div></div>
 <div class="row"><div><label>Latitude départ</label><input id="homeLat" type="number" step="0.000001"></div><div><label>Longitude départ</label><input id="homeLng" type="number" step="0.000001"></div></div>
 <label>Clé API OpenRouteService</label><input id="orsApiKey" placeholder="Colle ta clé OpenRouteService ici">
@@ -184,7 +184,7 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 </main>
 
 <script>
-const APP_VERSION="23.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
+const APP_VERSION="24.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
 let db=null,state={settings:null,clients:[],planning:[]};
 const monthNames=["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"],dayNames={1:"Lundi",2:"Mardi",3:"Mercredi",4:"Jeudi",5:"Vendredi",6:"Samedi"};
 function showTab(id){["home","clients","planning","turnover","map","backup"].forEach(x=>document.getElementById(x).classList.add("hidden"));document.getElementById(id).classList.remove("hidden");if(id==="backup")renderBackupStatus();if(id==="turnover")renderTurnover();if(id==="planning")renderPlanning();if(id==="map")renderMapLinks()}
@@ -298,7 +298,22 @@ if(c.useSecondFrequency){
   while(d<=end){jobs.push({month:d.getMonth(),duration:c.secondDuration,weekday:c.secondWeekday,placement:c.secondPlacement,forcedStart:c.secondForcedStart,forcedEnd:c.secondForcedEnd,secondary:true,targetDate:toISO(d)});d.setDate(d.getDate()+7*c.secondWeeks)}
 }
 return jobs}
-function renderClients(){let h="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{c=migrateClient(c);let jobs=expandClientJobs(c),ca=jobs.reduce((s,j)=>s+revenueFor(c,j.duration),0);h+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.frequencyMode}</span><span class="badge">${jobs.length} pass/an</span><span class="badge">${ca.toFixed(0)} €</span>${c.linkedGroup?`<span class="badge">Lié : ${c.linkedGroup}</span>`:""}${c.useSecondFrequency?`<span class="badge">2e fréquence</span>`:""}${c.useConsecutiveVisits?`<span class="badge">À la suite</span>`:""}${c.neighborOrder?`<span class="badge">${c.neighborOrder==="before"?"Avant":"Après"}</span>`:""}<br><span class="small">${c.address||""}</span><br><button onclick="editClient(${c.id})">Modifier</button><button class="danger" onclick="deleteClient(${c.id})">Supprimer</button></div>`});clientList.innerHTML=h||'<p class="small">Aucun client.</p>'}
+
+function refreshQuickClientSelect(){
+  if(!document.getElementById("quickClientSelect"))return;
+  let current=quickClientSelect.value;
+  let list=[...state.clients].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  quickClientSelect.innerHTML='<option value="">— Choisir un client —</option>'+list.map(c=>`<option value="${c.id}">${c.name}</option>`).join("");
+  quickClientSelect.value=current;
+}
+function quickEditClient(){
+  let id=quickClientSelect.value;
+  if(!id)return;
+  editClient(id);
+  setTimeout(()=>document.getElementById("clientName")?.scrollIntoView({behavior:"smooth",block:"center"}),100);
+}
+
+function renderClients(){refreshQuickClientSelect();let h="";state.clients.sort((a,b)=>(a.name||"").localeCompare(b.name||"")).forEach((c,i)=>{c=migrateClient(c);let jobs=expandClientJobs(c),ca=jobs.reduce((s,j)=>s+revenueFor(c,j.duration),0);h+=`<div class="client"><b>${c.name}</b><br><span class="badge">${c.type}</span><span class="badge">${c.frequencyMode}</span><span class="badge">${jobs.length} pass/an</span><span class="badge">${ca.toFixed(0)} €</span>${c.linkedGroup?`<span class="badge">Lié : ${c.linkedGroup}</span>`:""}${c.useSecondFrequency?`<span class="badge">2e fréquence</span>`:""}${c.useConsecutiveVisits?`<span class="badge">À la suite</span>`:""}${c.neighborOrder?`<span class="badge">${c.neighborOrder==="before"?"Avant":"Après"}</span>`:""}<br><span class="small">${c.address||""}</span><br><button onclick="editClient(${c.id})">Modifier</button><button class="danger" onclick="deleteClient(${c.id})">Supprimer</button></div>`});clientList.innerHTML=h||'<p class="small">Aucun client.</p>'}
 function parseVCF(t){let cards=t.split(/BEGIN:VCARD/i).slice(1),out=[];for(let raw of cards){let lines=raw.replace(/\r?\n[ \t]/g,"").split(/\r?\n/),c=emptyClient();for(let line of lines){line=line.trim();if(line.startsWith("FN:"))c.name=line.substring(3);else if(line.includes("EMAIL")&&line.includes(":"))c.email=line.split(":").slice(1).join(":");else if(line.includes("TEL")&&line.includes(":"))c.phone=line.split(":").slice(1).join(":");else if(line.includes("ADR")&&line.includes(":"))c.address=line.split(":").slice(1).join(":").replace(/;/g," ").replace(/\s+/g," ").trim()}if(c.name)out.push(c)}return out}
 async function importVCF(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=async ev=>{let arr=parseVCF(ev.target.result),n=0;for(let c of arr){if(!state.clients.some(x=>(x.name||"").toLowerCase()==c.name.toLowerCase())){await put("clients",c);n++}}state.clients=await getAll("clients");renderClients();scheduleAutosave("import");importStatus.innerHTML=`<div class="ok">${n} contact(s) importé(s).</div>`};r.readAsText(f)}
 function toISO(d){return d.toISOString().slice(0,10)}function parseDate(s){let [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
@@ -414,6 +429,8 @@ function fallbackSlots(c,dow,dur,job=null){
   if(normal.length)return normal;
   return [["Hors consigne","08:00",String(8+dur).padStart(2,"0")+":00",true,"fallback-"+dow+"-"+dur]];
 }
+function mins(t){let [h,m]=String(t||"00:00").split(":").map(Number);return (h||0)*60+(m||0);}
+function slotHours(s){return Math.max(0,(mins(s[2])-mins(s[1]))/60);}
 async function generatePlanning(){
   try{
     if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Génération en cours...</div>';
@@ -573,9 +590,9 @@ function renderTurnover(){let m=Array.from({length:12},()=>({cesu:0,ent:0,hours:
 function printPlanning(){showTab("planning");setTimeout(()=>window.print(),300)}
 function backupObject(){return{app:"Un Coup de Pousse PWA",version:APP_VERSION,exportedAt:new Date().toISOString(),settings:state.settings,clients:state.clients,planning:state.planning}}
 let autosaveTimer=null;function scheduleAutosave(r){if(autosaveTimer)clearTimeout(autosaveTimer);autosaveHeader.innerText="Auto-sauvegarde en attente…";autosaveTimer=setTimeout(()=>autoSave(r),800)}
-async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v23",id);updateAutoSaveHeader();renderBackupStatus()}
+async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v24",id);updateAutoSaveHeader();renderBackupStatus()}
 async function cleanupAutosaves(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));for(let i=12;i<all.length;i++)await del("autosaves",all[i].id)}
-function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v23");autosaveHeader.innerText=l?`Version 23 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 23 — pas encore sauvegardé"}
+function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v24");autosaveHeader.innerText=l?`Version 24 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 24 — pas encore sauvegardé"}
 async function renderBackupStatus(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));backupStatus.innerHTML=`<div class="ok">Clients : <b>${state.clients.length}</b><br>Copies locales : <b>${all.length}</b></div>`;autosaveList.innerHTML=all.map(a=>`<div class="client"><b>${new Date(a.id).toLocaleString("fr-FR")}</b><br><span class="small">${a.reason||""}</span><br><button onclick="restoreAutosave('${a.id}')">Restaurer</button><button onclick="downloadAutosave('${a.id}')">Télécharger</button></div>`).join("")}
 function download(name,txt,type){let b=new Blob([txt],{type}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 function exportBackup(){download("sauvegarde_ucdp.json",JSON.stringify(backupObject(),null,2),"application/json")}
@@ -799,7 +816,7 @@ function renderMapLinks(){
   mapLinks.innerHTML=html;
 }
 
-if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=23").then(r=>r.update()).catch(()=>{})}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=24").then(r=>r.update()).catch(()=>{})}
 openDB().then(loadAll);
 </script>
 </body>

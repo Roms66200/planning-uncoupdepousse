@@ -1,9 +1,6 @@
-# UCDP Planning V23
+# UCDP Planning V24
 
-Base restaurée proprement :
-- génération consolidée avec fonctions internes manquantes restaurées ;
-- affichage du planning placé avant les outils ;
-- outils “Modifier un rendez-vous” conservés ;
-- outil “Planning client / email / PDF” conservé ;
-- erreurs moins intrusives ;
-- vérification syntaxe JavaScript effectuée.
+Correctifs :
+- Ajout/restauration de slotHours, cause de l'erreur de génération.
+- Ajout d'un menu déroulant en haut de l'onglet Clients pour choisir rapidement un client à modifier.
+- Vérification syntaxe JavaScript effectuée.
