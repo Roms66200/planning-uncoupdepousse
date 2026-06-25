@@ -39,20 +39,20 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 <body>
 <header>
 <h1>Un Coup de Pousse — Planning</h1>
-<div class="status" id="autosaveHeader">Version 22</div>
+<div class="status" id="autosaveHeader">Version 23</div>
 <div class="tabs">
 <button onclick="showTab('home')">Accueil</button><button onclick="showTab('clients')">Clients</button><button onclick="showTab('planning')">Planning</button><button onclick="showTab('turnover')">CA</button><button onclick="showTab('map')">Carte</button><button onclick="showTab('backup')">Sauvegarde</button>
 </div>
 </header>
 <main>
 <section id="home" class="card">
-<h2>Accueil / Réglages</h2><div class="ok"><b>Version 22 installée</b> — fréquences spéciales, moteur planning consolidé et affichage planning au-dessus des outils.</div>
+<h2>Accueil / Réglages</h2><div class="ok"><b>Version 23 installée</b> — base stable, génération consolidée, planning affiché avant les outils.</div>
 <div class="row"><div><label>Année</label><input id="year" type="number" value="2027"></div><div><label>Adresse départ</label><input id="homeAddress" placeholder="Montescot, France"></div></div>
 <div class="row"><div><label>Latitude départ</label><input id="homeLat" type="number" step="0.000001"></div><div><label>Longitude départ</label><input id="homeLng" type="number" step="0.000001"></div></div>
 <label>Clé API OpenRouteService</label><input id="orsApiKey" placeholder="Colle ta clé OpenRouteService ici">
 <p class="small">Cette clé sert à calculer les kilomètres réels par la route. Sans clé, l’app utilise seulement la proximité GPS approximative.</p>
 <button onclick="geocodeHome()">Trouver GPS départ</button>
-<details class="dropdown"><summary>Horaires de travail</summary><div id="slots"></div><button onclick="applyDefaultSlots()">Planning type</button><button onclick="addFrenchHolidays()">Ajouter jours fériés</button><button onclick="saveSettingsNow()">Enregistrer</button></details>
+<h3>Horaires de travail</h3><div id="slots"></div><button onclick="applyDefaultSlots()">Planning type</button><button onclick="addFrenchHolidays()">Ajouter jours fériés</button><button onclick="saveSettingsNow()">Enregistrer</button>
 
 <div class="slot">
 <b>Souplesse du planning</b>
@@ -60,16 +60,6 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 <div class="row">
 <div><label>Décalage autorisé</label><select id="planningFlexDays"><option value="0">Aucun</option><option value="3">± 3 jours</option><option value="7" selected>± 7 jours</option><option value="14">± 14 jours</option><option value="30">Tout le mois</option></select></div>
 <div><label>Forcer placement</label><select id="forcePlacement"><option value="true" selected>Oui, mais en dernier recours</option><option value="false">Non, strict</option></select></div>
-</div>
-</div>
-
-
-<div class="slot">
-<b>Génération automatique</b>
-<p class="small">Après chaque modification client, le planning peut être régénéré automatiquement.</p>
-<div class="row">
-<div><label>Après enregistrement</label><select id="autoGenerateAfterSave"><option value="true" selected>Régénérer automatiquement</option><option value="false">Manuel</option></select></div>
-<div><label>Diagnostic client</label><select id="showClientDiagnostic"><option value="true" selected>Afficher</option><option value="false">Masquer</option></select></div>
 </div>
 </div>
 
@@ -138,23 +128,40 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 <label>Écart minimum entre passages</label><input id="minGap" type="number" value="7">
 <label>Jours autorisés</label><div class="days" id="allowedDays"><label><input type="checkbox" value="1" checked>Lun</label><label><input type="checkbox" value="2" checked>Mar</label><label><input type="checkbox" value="3" checked>Mer</label><label><input type="checkbox" value="4" checked>Jeu</label><label><input type="checkbox" value="5" checked>Ven</label><label><input type="checkbox" value="6" checked>Sam</label></div>
 <label>Notes</label><textarea id="notes"></textarea>
-<button onclick="saveClient()">Enregistrer client</button><button onclick="resetClientForm()">Nouveau</button><div id="clientStatus"></div><div id="clientDiagnostic"></div><h3>Liste</h3><div id="clientList"></div>
+<button onclick="saveClient()">Enregistrer client</button><button onclick="resetClientForm()">Nouveau</button><div id="clientStatus"></div><h3>Liste</h3><div id="clientList"></div>
 </section>
 
 <section id="planning" class="card hidden">
 <h2>Planning</h2>
 <div class="row"><div><label>Mois / semaine</label><select id="calendarMonth" onchange="renderPlanning()"></select></div><div><label>Vue</label><select id="viewMode" onchange="renderPlanning()"><option value="table">Tableau</option><option value="calendar">Calendrier mois</option><option value="week">Vue semaine</option></select></div></div>
 <button onclick="generatePlanning()">Générer l’année</button><button class="light" onclick="clearPlanningOnly()">Vider planning</button><button class="light" onclick="exportPlanningCSV()">Export CSV</button><button class="light" onclick="printPlanning()">PDF / imprimer</button>
-<h3>Affichage du planning</h3>
 
 
 
+
+<h3>Affichage du planning</h3><div id="generationStatus"></div><div id="summary"></div><div id="planningTable" class="tablewrap"></div><div id="calendarView"></div>
+<details class="dropdown"><summary>Modifier un rendez-vous</summary><div class="slot">
+<b>Modifier un rendez-vous</b>
+<p class="small">Sélectionne un rendez-vous généré, puis change la date ou le créneau. Tu peux aussi le verrouiller pour éviter de le perdre.</p>
+<div class="row">
+<div><label>Rendez-vous</label><select id="editVisitSelect" onchange="loadVisitEdit()"></select></div>
+<div><label>Nouvelle date</label><input id="editVisitDate" type="date"></div>
+</div>
+<div class="row">
+<div><label>Créneau</label><input id="editVisitSlot" placeholder="Matin 08:00-12:00"></div>
+<div><label>Verrouillé</label><select id="editVisitLocked"><option value="false">Non</option><option value="true">Oui</option></select></div>
+</div>
+<button onclick="applyVisitEdit()">Appliquer</button>
+</div></details>
+<div class="slot">
+<b>Planning client / email</b>
+<div class="row">
+<div><label>Client</label><select id="clientPdfSelect"></select></div>
 <div><label>Action</label><select id="clientAction"><option value="pdf">PDF / imprimer</option><option value="mail">Préparer email</option></select></div>
 </div>
 <button onclick="clientActionRun()">Lancer</button>
 <div id="clientPdfPrint" class="hidden"></div>
 </div>
-
 </section>
 
 <section id="turnover" class="card hidden"><h2>Chiffre d’affaires global</h2><button onclick="renderTurnover()">Actualiser le CA</button><div id="turnoverSummary"></div><div id="turnoverTable" class="tablewrap"></div></section>
@@ -177,14 +184,14 @@ details.dropdown summary{font-weight:800;font-size:18px;cursor:pointer}
 </main>
 
 <script>
-const APP_VERSION="22.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
+const APP_VERSION="23.0", DB_NAME="ucdp_pwa_db_v2", DB_VERSION=1;
 let db=null,state={settings:null,clients:[],planning:[]};
 const monthNames=["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"],dayNames={1:"Lundi",2:"Mardi",3:"Mercredi",4:"Jeudi",5:"Vendredi",6:"Samedi"};
 function showTab(id){["home","clients","planning","turnover","map","backup"].forEach(x=>document.getElementById(x).classList.add("hidden"));document.getElementById(id).classList.remove("hidden");if(id==="backup")renderBackupStatus();if(id==="turnover")renderTurnover();if(id==="planning")renderPlanning();if(id==="map")renderMapLinks()}
 function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open(DB_NAME,DB_VERSION);r.onupgradeneeded=e=>{let d=e.target.result;if(!d.objectStoreNames.contains("settings"))d.createObjectStore("settings",{keyPath:"id"});if(!d.objectStoreNames.contains("clients"))d.createObjectStore("clients",{keyPath:"id",autoIncrement:true});if(!d.objectStoreNames.contains("autosaves"))d.createObjectStore("autosaves",{keyPath:"id"})};r.onsuccess=e=>{db=e.target.result;res(db)};r.onerror=e=>rej(e)})}
 function tx(s,m="readonly"){return db.transaction(s,m).objectStore(s)}function getAll(s){return new Promise(res=>{let r=tx(s).getAll();r.onsuccess=()=>res(r.result||[])})}function put(s,o){return new Promise(res=>{let r=tx(s,"readwrite").put(o);r.onsuccess=()=>res(r.result)})}function del(s,k){return new Promise(res=>{let r=tx(s,"readwrite").delete(k);r.onsuccess=()=>res()})}function clearStore(s){return new Promise(res=>{let r=tx(s,"readwrite").clear();r.onsuccess=()=>res()})}
 function defaultSlots(){return{1:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],2:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],3:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]],4:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],5:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",true]],6:[["Matin","08:00","12:00",true],["Après-midi","13:30","17:30",false]]}}
-function defaultSettings(){return{id:"main",year:2027,homeAddress:"",homeLat:null,homeLng:null,blockedDates:"",orsApiKey:"",planningFlexDays:7,forcePlacement:"true",strictDays:"true",autoGenerateAfterSave:"true",showClientDiagnostic:"true",slots:defaultSlots()}}
+function defaultSettings(){return{id:"main",year:2027,homeAddress:"",homeLat:null,homeLng:null,blockedDates:"",orsApiKey:"",planningFlexDays:7,forcePlacement:"true",strictDays:"true",slots:defaultSlots()}}
 function emptyClient(){return{name:"",type:"CESU",address:"",email:"",phone:"",lat:null,lng:null,defaultDuration:4,priceMode:"visit",price:300,placementMode:"matin",forcedStart:"12:00",forcedEnd:"14:00",linkedGroup:"",neighborOrder:"",useSecondFrequency:false,useConsecutiveVisits:false,consecutiveMode:"nextday",consecutiveGap:1,secondStartMonth:3,secondEndMonth:9,secondWeeks:1,secondWeekday:3,secondDuration:2,secondPlacement:"forcer",secondForcedStart:"16:00",secondForcedEnd:"18:00",frequencyMode:"monthly",monthlyVisits:Array(12).fill(0),monthlyDurations:Array(12).fill(4),intervalStartMonth:2,intervalEndMonth:9,intervalWeeks:3,intervalDuration:4,specialMonths:Array.from({length:12},()=>({visits:0,duration:4})),exceptionMonths:Array.from({length:12},()=>({visits:0,duration:8})),monthPosition:"Indifférent",minGap:7,allowedDays:[1,2,3,4,5,6],notes:""}}
 function migrateClient(c){let n={...emptyClient(),...c};if(c.months&&!c.monthlyVisits)n.monthlyVisits=c.months;if(c.duration&&!c.defaultDuration)n.defaultDuration=c.duration;if(n.type!=="Entreprise")n.type="CESU";if(!n.specialMonths)n.specialMonths=Array.from({length:12},(_,i)=>({visits:n.monthlyVisits?.[i]||0,duration:n.defaultDuration||4}));if(!n.exceptionMonths)n.exceptionMonths=Array.from({length:12},()=>({visits:0,duration:8}));return n}
 async function loadAll(){let s=await getAll("settings");state.settings=s[0]||defaultSettings();if(!s[0])await put("settings",state.settings);state.clients=(await getAll("clients")).map(migrateClient);renderAll();scheduleAutosave("chargement")}
@@ -192,9 +199,9 @@ function renderAll(){buildSlots();buildMonths();buildCalendarMonth();renderSetti
 function buildSlots(){let w=slots;w.innerHTML="";let sl=state.settings?.slots||defaultSlots();for(let d=1;d<=6;d++){let h=`<div class="slot"><b>${dayNames[d]}</b>`;(sl[d]||defaultSlots()[d]).slice(0,2).forEach((s,i)=>{let n=i===0?"Matin":"Après-midi";h+=`<label>${n}</label><div class="row"><input id="slot_${d}_${i}_start" type="time" value="${s[1]}"><input id="slot_${d}_${i}_end" type="time" value="${s[2]}"></div><label><input id="slot_${d}_${i}_active" type="checkbox" ${s[3]?"checked":""}> ${n} actif</label>`});w.innerHTML+=h+"</div>"}}
 function buildMonths(){monthlyVisits.innerHTML="";specialMonths.innerHTML="";exceptionMonths.innerHTML="";monthNames.forEach((m,i)=>{monthlyVisits.innerHTML+=`<div><label>${m}</label><input id="mv${i}" type="number" min="0" max="4" value="0"></div>`;specialMonths.innerHTML+=`<div class="row"><div><label>${m} passages</label><input id="spv${i}" type="number" min="0" max="4" value="0"></div><div><label>${m} durée</label><select id="spd${i}"><option value="2">2 h</option><option value="4" selected>4 h</option><option value="8">8 h</option></select></div></div>`;exceptionMonths.innerHTML+=`<div class="row"><div><label>${m} extra</label><input id="exv${i}" type="number" min="0" max="4" value="0"></div><div><label>${m} durée extra</label><select id="exd${i}"><option value="2">2 h</option><option value="4">4 h</option><option value="8" selected>8 h</option></select></div></div>`})}
 function buildCalendarMonth(){calendarMonth.innerHTML=intervalStartMonth.innerHTML=intervalEndMonth.innerHTML=secondStartMonth.innerHTML=secondEndMonth.innerHTML="";monthNames.forEach((m,i)=>{calendarMonth.innerHTML+=`<option value="${i}">${m}</option>`;intervalStartMonth.innerHTML+=`<option value="${i}">${m}</option>`;intervalEndMonth.innerHTML+=`<option value="${i}">${m}</option>`;secondStartMonth.innerHTML+=`<option value="${i}">${m}</option>`;secondEndMonth.innerHTML+=`<option value="${i}">${m}</option>`})}
-function renderSettings(){let s=state.settings;year.value=s.year;homeAddress.value=s.homeAddress||"";homeLat.value=s.homeLat??"";homeLng.value=s.homeLng??"";blockedDates.value=s.blockedDates||"";orsApiKey.value=s.orsApiKey||"";planningFlexDays.value=s.planningFlexDays??7;forcePlacement.value=s.forcePlacement??"true";autoGenerateAfterSave.value=s.autoGenerateAfterSave??"true";showClientDiagnostic.value=s.showClientDiagnostic??"true"}
+function renderSettings(){let s=state.settings;year.value=s.year;homeAddress.value=s.homeAddress||"";homeLat.value=s.homeLat??"";homeLng.value=s.homeLng??"";blockedDates.value=s.blockedDates||"";orsApiKey.value=s.orsApiKey||"";planningFlexDays.value=s.planningFlexDays??7;forcePlacement.value=s.forcePlacement??"true"}
 function getSlotsFromUI(){let out={};for(let d=1;d<=6;d++){out[d]=[];for(let i=0;i<2;i++){let n=i===0?"Matin":"Après-midi";out[d].push([n,document.getElementById(`slot_${d}_${i}_start`).value,document.getElementById(`slot_${d}_${i}_end`).value,document.getElementById(`slot_${d}_${i}_active`).checked])}}return out}
-async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,orsApiKey:orsApiKey.value.trim(),planningFlexDays:+planningFlexDays.value,forcePlacement:forcePlacement.value,strictDays:"true",autoGenerateAfterSave:"true",showClientDiagnostic:"true",slots:getSlotsFromUI()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés.</div>'}
+async function saveSettingsNow(show=true){state.settings={...state.settings,year:parseInt(year.value||"2027"),homeAddress:homeAddress.value,homeLat:homeLat.value?parseFloat(homeLat.value):null,homeLng:homeLng.value?parseFloat(homeLng.value):null,blockedDates:blockedDates.value,orsApiKey:orsApiKey.value.trim(),planningFlexDays:+planningFlexDays.value,forcePlacement:forcePlacement.value,strictDays:"true",slots:getSlotsFromUI()};await put("settings",state.settings);scheduleAutosave("réglages");if(show)homeStatus.innerHTML='<div class="ok">Réglages enregistrés.</div>'}
 async function applyDefaultSlots(){state.settings.slots=defaultSlots();await put("settings",state.settings);buildSlots();scheduleAutosave("planning type");homeStatus.innerHTML='<div class="ok">Planning type appliqué.</div>'}
 function toggleFrequencyMode(){monthlyBox.classList.toggle("hidden",frequencyMode.value!=="monthly");intervalBox.classList.toggle("hidden",frequencyMode.value!=="interval");specialBox.classList.toggle("hidden",frequencyMode.value!=="special")}
 function toggleForcedTime(){forcedTimeBox.classList.toggle("hidden",!useForcedTime.checked);if(useForcedTime.checked)placementMode.value="forcer";else if(placementMode.value==="forcer")placementMode.value="matin"}
@@ -261,7 +268,6 @@ async function saveClient(){
     resetClientForm();
     renderClients();
     clientStatus.innerHTML='<div class="ok">Client enregistré.</div>';
-    await afterClientSaved(c.name);
     scheduleAutosave("client");
   }catch(err){
     clientStatus.innerHTML='<div class="warn">Erreur enregistrement : '+err.message+'</div>';
@@ -346,38 +352,6 @@ function consecutiveDatesAfter(prevDate,month,gap){
 }
 
 
-
-async function afterClientSaved(clientName){
-  try{
-    if(state.settings?.autoGenerateAfterSave==="true"){
-      if(document.getElementById("generationStatus"))generationStatus.innerHTML='<div class="warn">Mise à jour automatique du planning...</div>';
-      await generatePlanning();
-    }
-    if(state.settings?.showClientDiagnostic!=="false") renderClientDiagnostic(clientName);
-  }catch(err){
-    clientStatus.innerHTML='<div class="warn">Client enregistré, mais génération impossible : '+err.message+'</div>';
-  }
-}
-function renderClientDiagnostic(clientName){
-  let visits=state.planning.filter(p=>p.client===clientName);
-  if(!visits.length){
-    clientDiagnostic.innerHTML='<div class="warn">Diagnostic : aucun rendez-vous généré pour ce client. Vérifie la fréquence, les jours autorisés ou génère l’année depuis l’onglet Planning.</div>';
-    return;
-  }
-  let non=visits.filter(p=>p.date==="NON PLACÉ");
-  let relaxed=visits.filter(p=>p.relaxed);
-  let months={};
-  visits.forEach(p=>{
-    let key=p.date==="NON PLACÉ"?"Non placé":p.date.slice(0,7);
-    months[key]=(months[key]||0)+1;
-  });
-  let monthTxt=Object.entries(months).map(([m,n])=>`${m} : ${n}`).join("<br>");
-  let cls=non.length?'warn':'ok';
-  let msg=non.length?`<b>Attention :</b> ${non.length} rendez-vous non placé(s).`:`<b>OK :</b> ${visits.length} rendez-vous généré(s).`;
-  if(relaxed.length)msg+=`<br>${relaxed.length} rendez-vous placé(s) hors consigne ou décalé(s).`;
-  clientDiagnostic.innerHTML=`<div class="${cls}">${msg}<br><br><b>Répartition :</b><br>${monthTxt}</div>`;
-}
-
 function clearPlanningOnly(){
   if(confirm("Vider uniquement le planning généré ? Les clients restent enregistrés.")){
     state.planning=[];
@@ -388,8 +362,20 @@ function clearPlanningOnly(){
   }
 }
 
-
-
+function hhmm(total){
+  total=Math.round(total);
+  let h=Math.floor(total/60),m=total%60;
+  return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
+}
+function used(date,key){
+  return state.planning
+    .filter(p=>p.date===date && p.slotKey===key)
+    .reduce((a,p)=>a+(Number(p.duration)||0),0);
+}
+function usedMinutes(date,key){return used(date,key)*60;}
+function clientAlreadyThisDay(client,date){
+  return state.planning.some(p=>p.client===client && p.date===date);
+}
 function gapOK(c,date){
   let gap=Number(c.minGap||0);
   if(!gap)return true;
@@ -399,11 +385,12 @@ function gapOK(c,date){
     .map(p=>parseDate(p.date))
     .every(x=>Math.abs((d-x)/86400000)>=gap);
 }
-
-function clientAlreadyThisDay(client,date){
-  return state.planning.some(p=>p.client===client && p.date===date);
+function makeActualSlot(s,date,key,duration){
+  let start=mins(s[1])+usedMinutes(date,key);
+  let end=start+duration*60;
+  if(end>mins(s[2])){start=mins(s[1]);end=mins(s[2]);}
+  return `${s[0]} ${hhmm(start)}-${hhmm(end)}`;
 }
-
 function compatibleSlots(c,dow,dur,job=null){
   let placement=job?.placement||c.placementMode;
   let fStart=job?.forcedStart||c.forcedStart;
@@ -427,28 +414,9 @@ function fallbackSlots(c,dow,dur,job=null){
   if(normal.length)return normal;
   return [["Hors consigne","08:00",String(8+dur).padStart(2,"0")+":00",true,"fallback-"+dow+"-"+dur]];
 }
-function used(date,key){
-  return state.planning
-    .filter(p=>p.date===date && p.slotKey===key)
-    .reduce((a,p)=>a+(Number(p.duration)||0),0);
-}
-function usedMinutes(date,key){
-  return used(date,key)*60;
-}
-function hhmm(total){
-  total=Math.round(total);
-  let h=Math.floor(total/60),m=total%60;
-  return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
-}
-function makeActualSlot(s,date,key,duration){
-  let start=mins(s[1])+usedMinutes(date,key);
-  let end=start+duration*60;
-  if(end>mins(s[2])){start=mins(s[1]);end=mins(s[2]);}
-  return `${s[0]} ${hhmm(start)}-${hhmm(end)}`;
-}
 async function generatePlanning(){
   try{
-    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Génération en cours...</div>';
+    if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Génération en cours...</div>';
 
   await saveSettingsNow(false);
 
@@ -592,9 +560,9 @@ async function generatePlanning(){
   if(document.getElementById("mapDate"))mapDate.innerHTML="";
   scheduleAutosave("planning");
 
-    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="ok">Planning généré.</div>';
+    if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="ok">Planning généré.</div>';
   }catch(err){
-    if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Erreur génération : '+err.message+'</div>';
+    if(document.getElementById('generationStatus'))generationStatus.innerHTML='<div class="warn">Erreur génération : '+err.message+'</div>';
     console.warn('Erreur génération : '+err.message);
     console.error(err);
   }
@@ -605,9 +573,9 @@ function renderTurnover(){let m=Array.from({length:12},()=>({cesu:0,ent:0,hours:
 function printPlanning(){showTab("planning");setTimeout(()=>window.print(),300)}
 function backupObject(){return{app:"Un Coup de Pousse PWA",version:APP_VERSION,exportedAt:new Date().toISOString(),settings:state.settings,clients:state.clients,planning:state.planning}}
 let autosaveTimer=null;function scheduleAutosave(r){if(autosaveTimer)clearTimeout(autosaveTimer);autosaveHeader.innerText="Auto-sauvegarde en attente…";autosaveTimer=setTimeout(()=>autoSave(r),800)}
-async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v22",id);updateAutoSaveHeader();renderBackupStatus()}
+async function autoSave(reason){let id=new Date().toISOString();await put("autosaves",{id,reason,data:backupObject()});await cleanupAutosaves();localStorage.setItem("ucdp_last_autosave_v23",id);updateAutoSaveHeader();renderBackupStatus()}
 async function cleanupAutosaves(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));for(let i=12;i<all.length;i++)await del("autosaves",all[i].id)}
-function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v22");autosaveHeader.innerText=l?`Version 22 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 22 — pas encore sauvegardé"}
+function updateAutoSaveHeader(){let l=localStorage.getItem("ucdp_last_autosave_v23");autosaveHeader.innerText=l?`Version 23 — dernière sauvegarde : ${new Date(l).toLocaleString("fr-FR")}`:"Version 23 — pas encore sauvegardé"}
 async function renderBackupStatus(){let all=await getAll("autosaves");all.sort((a,b)=>b.id.localeCompare(a.id));backupStatus.innerHTML=`<div class="ok">Clients : <b>${state.clients.length}</b><br>Copies locales : <b>${all.length}</b></div>`;autosaveList.innerHTML=all.map(a=>`<div class="client"><b>${new Date(a.id).toLocaleString("fr-FR")}</b><br><span class="small">${a.reason||""}</span><br><button onclick="restoreAutosave('${a.id}')">Restaurer</button><button onclick="downloadAutosave('${a.id}')">Télécharger</button></div>`).join("")}
 function download(name,txt,type){let b=new Blob([txt],{type}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 function exportBackup(){download("sauvegarde_ucdp.json",JSON.stringify(backupObject(),null,2),"application/json")}
@@ -831,7 +799,7 @@ function renderMapLinks(){
   mapLinks.innerHTML=html;
 }
 
-if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=22").then(r=>r.update()).catch(()=>{})}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js?ver=23").then(r=>r.update()).catch(()=>{})}
 openDB().then(loadAll);
 </script>
 </body>

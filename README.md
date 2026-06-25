@@ -1,8 +1,9 @@
-# UCDP Planning V22
+# UCDP Planning V23
 
-Correctifs :
-- Ajout/restauration des fonctions internes used, usedMinutes, hhmm et makeActualSlot.
-- Affichage du planning placé au-dessus de “Modifier un rendez-vous”.
-- Outils de modification et planning client/email placés après l’affichage.
-- Alertes de génération moins bloquantes.
-- Vérification syntaxe JavaScript effectuée.
+Base restaurée proprement :
+- génération consolidée avec fonctions internes manquantes restaurées ;
+- affichage du planning placé avant les outils ;
+- outils “Modifier un rendez-vous” conservés ;
+- outil “Planning client / email / PDF” conservé ;
+- erreurs moins intrusives ;
+- vérification syntaxe JavaScript effectuée.
